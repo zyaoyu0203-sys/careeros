@@ -1,13 +1,15 @@
 import { FileText, Radar, Send } from "lucide-react";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { Brand } from "@/components/brand";
 import { supabaseConfigured } from "@/lib/store";
 import { LoginForm } from "./login-form";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  await connection();
   if (!supabaseConfigured) redirect("/");
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">

@@ -25,10 +25,22 @@ export async function saveProfile(profile: Profile, opts: { finishOnboarding?: b
     const next: Profile = { ...profile, updatedAt: now, onboardedAt: profile.onboardedAt ?? (opts.finishOnboarding ? now : null) };
     await db.put(userId, "profile", "me", next);
 
+    // Versions are views over the knowledge base, so rebuild them whenever it changes.
+    // Tailored drafts are left alone: they were approved as written.
+    const resumes = await db.list(userId, "resumes");
+    const versions = resumes.filter(r => r.kind === "version");
+    await db.putMany(
+      userId,
+      "resumes",
+      versions.map(v => {
+        const ids = v.experienceIds.filter(id => next.experiences.some(e => e.id === id));
+        return { id: v.id, data: { ...v, experienceIds: ids, content: buildResumeContent(next, ids), updatedAt: now } };
+      }),
+    );
+
     // Every user starts with one general resume version built from their knowledge base.
     if (opts.finishOnboarding) {
-      const resumes = await db.list(userId, "resumes");
-      if (!resumes.some(r => r.kind === "version")) {
+      if (versions.length === 0) {
         const prefs = await getPreferences(userId);
         const general = newVersion(next, "General", prefs.roles, []);
         await db.put(userId, "resumes", general.id, general);

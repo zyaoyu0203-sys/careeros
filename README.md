@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CareerOS
 
-## Getting Started
+A job seeker portal: it searches the sources you choose, scores every role against your own
+knowledge base, picks (or tailors) the right resume, prepares an application pack, and tracks
+each application from preparing to offer. It never submits an application on your behalf.
 
-First, run the development server:
+## How it works
+
+| Area | What it does | Code |
+|---|---|---|
+| Knowledge base | Onboarding wizard + editor: contact, education, experience facts, skills, standard application answers (work rights, sponsorship, start date…) | `src/app/onboarding`, `src/app/(app)/profile`, `src/components/fields.tsx` |
+| Job push | Fetches public ATS boards (Greenhouse, Lever, Ashby) and Google Jobs via SerpAPI, filters by target-role words in the title, dedupes, scores (Claude, or a keyword fallback) | `src/lib/sources`, `src/lib/discovery.ts`, `src/app/api/cron/discover` |
+| Resumes | Versions are views over the knowledge base, routed to jobs by focus keywords; tailored drafts are rewritten per job from verified facts only and need approval | `src/lib/resume.ts`, `src/lib/ai/claude.ts`, `src/app/(app)/resumes` |
+| Application packs | Chosen resume (print to PDF), copyable form answers, optional cover letter, link to the employer's form | `src/app/(app)/applications/[id]` |
+| Tracker | Status per application with history | `src/app/(app)/applications` |
+
+Data lives in one Supabase table, `records` (per user, per collection, JSON), protected by
+row-level security — see `supabase/migrations`. Without Supabase env vars the app runs in a
+single-user local mode backed by `.data/db.json`; that mode refuses to run on Vercel.
+
+## Develop
 
 ```bash
+npm install
+cp .env.example .env.local   # optional: leave blank for local mode
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+In local mode, onboarding offers a fictional demo profile.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploy (Vercel + Supabase)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Create a Supabase project, then apply the migration:
+   `npx supabase link --project-ref <ref>` and `npx supabase db query --linked -f supabase/migrations/20261101000000_records.sql`
+2. In Supabase → Authentication → URL configuration, set the Site URL to the production domain.
+3. Add the variables from `.env.example` to the Vercel project (`vercel env add`).
+4. `vercel deploy --prod`. The cron in `vercel.json` runs the search daily at 08:00 Hong Kong time;
+   each user's own schedule (daily / weekly / manual) decides whether their search runs.

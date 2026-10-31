@@ -13,7 +13,7 @@ export function buildResumeContent(profile: Profile, experienceIds: string[]): R
       company: e.company,
       title: e.title,
       period: `${e.start} – ${e.end}`,
-      bullets: [...e.bullets, ...e.metrics.filter(m => !e.bullets.some(b => b.includes(m)))].slice(0, 5),
+      bullets: e.bullets.slice(0, 5),
     })),
     education: profile.education.map(ed => ({
       school: ed.school,

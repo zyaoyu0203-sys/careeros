@@ -6,6 +6,7 @@ import { Tabs } from "@/components/tabs";
 import { Badge, Card, CompanyMark, formatDate, LinkButton, Meter, ScorePill, relativeDays } from "@/components/ui";
 import { getPreferences, getProfile, listApplications, listJobs, listResumes, profileCompleteness } from "@/lib/data";
 import { requireUserId } from "@/lib/session";
+import { googleJobsAvailable } from "@/lib/sources";
 import type { Application, ApplicationStatus } from "@/lib/types";
 
 const FOLLOW_UP_DAYS = 7;
@@ -32,7 +33,9 @@ export default async function HomePage() {
   const active = apps.filter(a => ACTIVE.includes(a.status));
   const followUps = apps.filter(needsFollowUp);
   const topJob = newJobs[0];
-  const sourceCount = prefs.sources.greenhouse.length + prefs.sources.lever.length + prefs.sources.ashby.length + (prefs.sources.googleJobs ? 1 : 0);
+  const newCompanies = [...new Set(newJobs.map(j => j.company))];
+  const sourceCount =
+    prefs.sources.greenhouse.length + prefs.sources.lever.length + prefs.sources.ashby.length + (prefs.sources.googleJobs && googleJobsAvailable() ? 1 : 0);
 
   const slides: Slide[] = [
     newJobs.length
@@ -144,7 +147,7 @@ export default async function HomePage() {
                     <div className="bg-blue-100 px-5 py-2 text-[13px] text-navy-800">{prefs.lastRunSummary ?? `Searches run ${prefs.frequency === "manual" ? "when you ask" : prefs.frequency}`}</div>
                     <DayRow
                       label="New roles to review"
-                      detail={newJobs.length ? newJobs.slice(0, 2).map(j => j.company).join(", ") + (newJobs.length > 2 ? ` and ${newJobs.length - 2} more` : "") : "Nothing new yet"}
+                      detail={newCompanies.length ? newCompanies.slice(0, 2).join(", ") + (newJobs.length > 2 ? ` · ${newJobs.length} roles` : "") : "Nothing new yet"}
                       count={newJobs.length}
                       href="/jobs"
                       cta="Review"
