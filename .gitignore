@@ -43,3 +43,8 @@ next-env.d.ts
 # local development store
 /.data
 !.env.example
+
+# test output
+/.next-e2e
+/playwright-report
+/test-results

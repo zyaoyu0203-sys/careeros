@@ -4,7 +4,8 @@ import path from "path";
 import type { Store } from "./index";
 
 // Development-only store: one JSON file on disk. Production uses Supabase.
-const FILE = path.join(process.cwd(), ".data", "db.json");
+// CAREEROS_DATA_FILE lets end-to-end tests use a throwaway file.
+const FILE = process.env.CAREEROS_DATA_FILE ?? path.join(process.cwd(), ".data", "db.json");
 
 type Db = Record<string, Record<string, Record<string, unknown>>>; // user -> collection -> id -> data
 

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { aiAvailable, importResumeText, tailorResume, writeCoverLetter } from "@/lib/ai/claude";
-import { getPreferences, getProfile, newId } from "@/lib/data";
+import { getPreferences, getProfile, isDemoUser, newId } from "@/lib/data";
 import { addManualJob, chooseResumeVersion, runDiscovery } from "@/lib/discovery";
 import { buildResumeContent, newVersion } from "@/lib/resume";
 import { requireUserId } from "@/lib/session";
@@ -341,4 +341,39 @@ export async function signOut(): Promise<void> {
     await supabase.auth.signOut();
   }
   redirect("/login");
+}
+
+// ---------- Demo account: scripted flows for presentations ----------
+
+/** Releases the next batch of held-back roles, as if a search had just found them. */
+export async function demoRevealBatch(): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!isDemoUser(userId)) return { ok: false, error: "Not available" };
+  const db = store();
+  const hidden = (await db.list(userId, "jobs")).filter(j => j.hidden).sort((a, b) => b.score - a.score).slice(0, 8);
+  const now = new Date().toISOString();
+  await db.putMany(userId, "jobs", hidden.map(j => ({ id: j.id, data: { ...j, hidden: false, status: "new", fetchedAt: now } })));
+  const prefs = await getPreferences(userId);
+  await db.put(userId, "preferences", "me", { ...prefs, lastRunAt: now, lastRunSummary: `${hidden.length} new of 2,031 fetched` });
+  revalidatePath("/", "layout");
+  return { ok: true, message: `${hidden.length} new roles matched` };
+}
+
+/** Records a one-click application with the chosen resume (demo account only). */
+export async function demoOneClickApply(jobId: string, resumeId: string): Promise<ActionResult> {
+  const userId = await requireUserId();
+  if (!isDemoUser(userId)) return { ok: false, error: "Not available" };
+  const db = store();
+  const job = await db.get(userId, "jobs", jobId);
+  if (!job) return { ok: false, error: "Job not found" };
+  const now = new Date().toISOString();
+  const id = newId("app");
+  await db.put(userId, "applications", id, {
+    id, jobId, company: job.company, title: job.title, url: job.url, resumeId, status: "applied", appliedAt: now,
+    notes: "Submitted via one-click apply.", coverLetter: "",
+    history: [{ status: "preparing", at: now }, { status: "applied", at: now }], createdAt: now, updatedAt: now,
+  });
+  await db.put(userId, "jobs", jobId, { ...job, status: "applying" });
+  revalidatePath("/", "layout");
+  return { ok: true, message: id };
 }

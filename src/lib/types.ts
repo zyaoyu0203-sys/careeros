@@ -95,6 +95,7 @@ export type Job = {
   risks: string[];
   suggestedResumeId: string | null;
   status: JobStatus;
+  hidden?: boolean; // demo account only: held back until a scripted search "finds" it
 };
 
 export type ResumeContent = {

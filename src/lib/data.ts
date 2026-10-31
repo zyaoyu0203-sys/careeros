@@ -53,7 +53,7 @@ export async function getPreferences(userId: string, opts?: { system?: boolean }
 }
 
 export async function listJobs(userId: string): Promise<Job[]> {
-  const jobs = await store().list(userId, "jobs");
+  const jobs = (await store().list(userId, "jobs")).filter(j => !j.hidden);
   return jobs.sort((a, b) => b.score - a.score || b.fetchedAt.localeCompare(a.fetchedAt));
 }
 
@@ -91,3 +91,6 @@ export function profileCompleteness(profile: Profile): { percent: number; missin
 }
 
 export const newId = (prefix: string) => `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
+
+/** The demo account plays scripted search and apply flows instead of the real ones. */
+export const isDemoUser = (userId: string) => (process.env.DEMO_USER_IDS ?? "").split(",").includes(userId);
