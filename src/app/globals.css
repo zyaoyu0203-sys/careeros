@@ -1,26 +1,118 @@
 @import "tailwindcss";
 
+/* CareerOS design tokens — a calm university-portal palette: deep navy structure,
+   one clear blue for actions, amber reserved for things that need attention. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --navy-950: #071a33;
+  --navy-900: #0b2545;
+  --navy-800: #13315c;
+  --navy-700: #1d4e89;
+  --blue-600: #2c64b0;
+  --blue-500: #3b74c4;
+  --blue-200: #c7d8f0;
+  --blue-100: #e3ecf8;
+  --blue-50: #f2f6fc;
+  --ink: #0f1b2d;
+  --ink-soft: #33435a;
+  --muted: #5d6c80;
+  --line: #dbe3ee;
+  --line-soft: #e9eef5;
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --amber-500: #e09b2d;
+  --amber-100: #fcf0dc;
+  --rose-600: #c2410c;
+  --rose-100: #fdebe3;
+  --green-600: #1f7a52;
+  --green-100: #e2f3ea;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-navy-950: var(--navy-950);
+  --color-navy-900: var(--navy-900);
+  --color-navy-800: var(--navy-800);
+  --color-navy-700: var(--navy-700);
+  --color-blue-600: var(--blue-600);
+  --color-blue-500: var(--blue-500);
+  --color-blue-200: var(--blue-200);
+  --color-blue-100: var(--blue-100);
+  --color-blue-50: var(--blue-50);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-amber-500: var(--amber-500);
+  --color-amber-100: var(--amber-100);
+  --color-rose-600: var(--rose-600);
+  --color-rose-100: var(--rose-100);
+  --color-green-600: var(--green-600);
+  --color-green-100: var(--green-100);
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-serif-display);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Diagonal accent shapes echoing the portal reference, used on navy panels. */
+.navy-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--navy-900);
+  color: white;
+  isolation: isolate;
+}
+.navy-panel::before,
+.navy-panel::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  background: var(--navy-700);
+  opacity: 0.55;
+  transform: rotate(45deg);
+}
+.navy-panel::before {
+  width: 140px;
+  height: 140px;
+  top: -96px;
+  left: -48px;
+}
+.navy-panel::after {
+  width: 180px;
+  height: 180px;
+  right: -110px;
+  bottom: -120px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
 }
