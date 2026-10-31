@@ -1,0 +1,5 @@
+project_id = "careeros"
+
+[auth]
+site_url = "https://careeros-mocha-kappa.vercel.app"
+additional_redirect_urls = ["https://careeros-mocha-kappa.vercel.app/auth/confirm", "http://localhost:3100/auth/confirm"]
