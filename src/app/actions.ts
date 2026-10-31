@@ -107,10 +107,12 @@ export async function importResume(text: string): Promise<{ ok: true; profile: P
 export async function discoverNow(): Promise<ActionResult> {
   try {
     const userId = await requireUserId();
-    const result = await runDiscovery(userId);
+    const run = await runDiscovery(userId, { trigger: "manual" });
     revalidatePath("/", "layout");
-    const parts = [`${result.added} new role${result.added === 1 ? "" : "s"} from ${result.fetched} fetched`];
-    if (result.errors.length) parts.push(`${result.errors.length} source error(s): ${result.errors.slice(0, 2).join("; ")}`);
+    const failed = run.sources.filter(s => s.error).length;
+    const parts = [`${run.added} new role${run.added === 1 ? "" : "s"} from ${run.fetched} fetched`];
+    if (failed) parts.push(`${failed} source error(s) — see Job sources › Search history`);
+    if (run.aiError) parts.push("AI scoring failed, keyword scores used");
     return { ok: true, message: parts.join(" · ") };
   } catch (error) {
     return fail(error);

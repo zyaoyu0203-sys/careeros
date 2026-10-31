@@ -3,7 +3,7 @@ import { aiAvailable, scoreJobs } from "@/lib/ai/claude";
 import { getPreferences, newId } from "@/lib/data";
 import { fetchAll, type RawJob } from "@/lib/sources";
 import { store } from "@/lib/store";
-import type { Job, Preferences, Profile, Resume } from "@/lib/types";
+import type { Job, Preferences, Profile, Resume, SearchRun } from "@/lib/types";
 
 const MAX_AI_SCORED_PER_RUN = 24;
 
@@ -88,9 +88,10 @@ export function isDue(prefs: Preferences, now = new Date()) {
   return prefs.frequency === "daily" ? hours >= 20 : hours >= 24 * 6.5;
 }
 
-export type DiscoveryResult = { fetched: number; matched: number; added: number; aiScored: number; errors: string[] };
+const MAX_RUNS_KEPT = 30;
 
-export async function runDiscovery(userId: string, opts: { system?: boolean } = {}): Promise<DiscoveryResult> {
+export async function runDiscovery(userId: string, opts: { system?: boolean; trigger?: SearchRun["trigger"] } = {}): Promise<SearchRun> {
+  const startedAt = new Date().toISOString();
   const db = store(opts);
   const [prefs, profile, resumes, existing] = await Promise.all([
     getPreferences(userId, opts),
@@ -101,7 +102,7 @@ export async function runDiscovery(userId: string, opts: { system?: boolean } = 
   if (!profile) throw new Error("Complete onboarding before running discovery");
   const versions = resumes.filter(r => r.kind === "version");
 
-  const { jobs: raw, errors } = await fetchAll(prefs);
+  const { jobs: raw, stats } = await fetchAll(prefs);
   const seen = new Set(existing.flatMap(j => [j.sourceId, dedupeKey(j)]));
   const fresh: RawJob[] = [];
   for (const job of raw) {
@@ -128,6 +129,7 @@ export async function runDiscovery(userId: string, opts: { system?: boolean } = 
   candidates.sort((a, b) => b.score - a.score);
 
   let aiScored = 0;
+  let aiError: string | null = null;
   if (aiAvailable() && candidates.length) {
     const top = candidates.slice(0, MAX_AI_SCORED_PER_RUN);
     try {
@@ -146,15 +148,33 @@ export async function runDiscovery(userId: string, opts: { system?: boolean } = 
         aiScored++;
       }
     } catch (error) {
-      errors.push(`AI scoring: ${error instanceof Error ? error.message : String(error)}`);
+      aiError = error instanceof Error ? error.message : String(error);
+      console.error("AI scoring failed", error);
     }
   }
 
   await db.putMany(userId, "jobs", candidates.map(job => ({ id: job.id, data: job })));
-  const summary = `${candidates.length} new of ${raw.length} fetched${errors.length ? ` · ${errors.length} source error(s)` : ""}`;
-  await db.put(userId, "preferences", "me", { ...prefs, lastRunAt: now, lastRunSummary: summary });
 
-  return { fetched: raw.length, matched: fresh.length, added: candidates.length, aiScored, errors };
+  const failed = stats.filter(s => s.error).length;
+  const run: SearchRun = {
+    id: newId("run"),
+    trigger: opts.trigger ?? "manual",
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    sources: stats,
+    fetched: raw.length,
+    matched: fresh.length,
+    added: candidates.length,
+    aiScored,
+    aiError,
+  };
+  await db.put(userId, "runs", run.id, run);
+  const runs = await db.list(userId, "runs");
+  for (const old of runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(MAX_RUNS_KEPT)) await db.remove(userId, "runs", old.id);
+
+  const summary = `${candidates.length} new of ${raw.length} fetched${failed ? ` · ${failed} source error(s)` : ""}${aiError ? " · AI scoring failed" : ""}`;
+  await db.put(userId, "preferences", "me", { ...prefs, lastRunAt: run.finishedAt, lastRunSummary: summary });
+  return run;
 }
 
 /** Score and save a job the user pasted in themselves. */

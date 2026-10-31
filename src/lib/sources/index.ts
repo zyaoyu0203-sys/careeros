@@ -1,5 +1,5 @@
 import "server-only";
-import type { Preferences, SourceKind } from "@/lib/types";
+import type { Preferences, SourceKind, SourceStat } from "@/lib/types";
 
 // A job as it comes off a source, before scoring. Every fetcher returns this shape.
 export type RawJob = {
@@ -121,8 +121,8 @@ async function googleJobs(query: string, location: string): Promise<RawJob[]> {
 
 export const googleJobsAvailable = () => Boolean(process.env.SERPAPI_API_KEY);
 
-/** Fetch from every configured source. A failing source is reported, not fatal. */
-export async function fetchAll(prefs: Preferences): Promise<{ jobs: RawJob[]; errors: string[] }> {
+/** Fetch from every configured source. A failing source is recorded, not fatal. */
+export async function fetchAll(prefs: Preferences): Promise<{ jobs: RawJob[]; stats: SourceStat[] }> {
   const tasks: { label: string; run: () => Promise<RawJob[]> }[] = [
     ...prefs.sources.greenhouse.map(b => ({ label: `Greenhouse/${b}`, run: () => greenhouse(b) })),
     ...prefs.sources.lever.map(c => ({ label: `Lever/${c}`, run: () => lever(c) })),
@@ -137,12 +137,18 @@ export async function fetchAll(prefs: Preferences): Promise<{ jobs: RawJob[]; er
     }
   }
 
-  const results = await Promise.allSettled(tasks.map(task => task.run()));
   const jobs: RawJob[] = [];
-  const errors: string[] = [];
-  results.forEach((result, i) => {
-    if (result.status === "fulfilled") jobs.push(...result.value);
-    else errors.push(`${tasks[i].label}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`);
-  });
-  return { jobs, errors };
+  const stats = await Promise.all(
+    tasks.map(async (task): Promise<SourceStat> => {
+      const started = Date.now();
+      try {
+        const found = await task.run();
+        jobs.push(...found);
+        return { label: task.label, fetched: found.length, ms: Date.now() - started, error: null };
+      } catch (error) {
+        return { label: task.label, fetched: 0, ms: Date.now() - started, error: error instanceof Error ? error.message : String(error) };
+      }
+    }),
+  );
+  return { jobs, stats };
 }

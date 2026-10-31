@@ -143,11 +143,28 @@ export type Application = {
   updatedAt: string;
 };
 
+export type SourceStat = { label: string; fetched: number; ms: number; error: string | null };
+
+/** One execution of the discovery pipeline, kept for observability. */
+export type SearchRun = {
+  id: string;
+  trigger: "manual" | "schedule";
+  startedAt: string;
+  finishedAt: string;
+  sources: SourceStat[];
+  fetched: number;
+  matched: number; // passed filters and not seen before
+  added: number;
+  aiScored: number;
+  aiError: string | null;
+};
+
 export type Collections = {
   profile: Profile;
   preferences: Preferences;
   jobs: Job;
   resumes: Resume;
   applications: Application;
+  runs: SearchRun;
 };
 export type CollectionName = keyof Collections;

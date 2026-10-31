@@ -1,6 +1,6 @@
 import "server-only";
 import { store } from "@/lib/store";
-import type { Application, Job, Preferences, Profile, Resume } from "@/lib/types";
+import type { Application, Job, Preferences, Profile, Resume, SearchRun } from "@/lib/types";
 
 export const emptyProfile = (): Profile => ({
   fullName: "",
@@ -65,6 +65,11 @@ export async function listResumes(userId: string): Promise<Resume[]> {
 export async function listApplications(userId: string): Promise<Application[]> {
   const apps = await store().list(userId, "applications");
   return apps.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function listRuns(userId: string): Promise<SearchRun[]> {
+  const runs = await store().list(userId, "runs");
+  return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
 /** Share of onboarding fields that are filled — drives the "profile strength" meter. */

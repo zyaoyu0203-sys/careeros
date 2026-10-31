@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   const db = store({ system: true });
   const users = await db.usersWithPreferences();
-  const results: { user: string; added?: number; skipped?: boolean; error?: string }[] = [];
+  const results: { user: string; added?: number; aiScored?: number; skipped?: boolean; error?: string }[] = [];
 
   for (const user of users) {
     try {
@@ -23,8 +23,8 @@ export async function GET(request: Request) {
         results.push({ user, skipped: true });
         continue;
       }
-      const r = await runDiscovery(user, { system: true });
-      results.push({ user, added: r.added });
+      const run = await runDiscovery(user, { system: true, trigger: "schedule" });
+      results.push({ user, added: run.added, aiScored: run.aiScored, ...(run.aiError ? { error: "AI scoring failed" } : {}) });
     } catch (error) {
       results.push({ user, error: error instanceof Error ? error.message : String(error) });
     }
