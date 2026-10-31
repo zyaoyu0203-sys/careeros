@@ -211,6 +211,7 @@ export async function tailorForJob(jobId: string): Promise<ActionResult> {
       focus: base.focus,
       experienceIds: content.experiences.map(e => e.experienceId),
       jobId,
+      baseId: base.id,
       content,
       approved: false,
       createdAt: now,

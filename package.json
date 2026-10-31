@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "demo:local": "node --conditions=react-server --import tsx scripts/demo-data.ts --local"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",
@@ -29,6 +30,7 @@
     "eslint-config-next": "15.5.28",
     "supabase": "^2.122.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

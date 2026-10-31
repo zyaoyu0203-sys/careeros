@@ -112,6 +112,7 @@ export type Resume = {
   focus: string[]; // role keywords this version targets; used for automatic routing
   experienceIds: string[];
   jobId: string | null; // tailored resumes only
+  baseId?: string | null; // tailored resumes: the version they were cut from
   content: ResumeContent;
   approved: boolean; // tailored resumes must be approved before use
   createdAt: string;

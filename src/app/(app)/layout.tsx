@@ -42,6 +42,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             { href: "/jobs", label: "Jobs", count: jobs.filter(j => j.status === "new").length },
             { href: "/resumes", label: "Resumes", count: resumes.filter(r => !r.approved).length },
             { href: "/applications", label: "Applications", count: apps.filter(a => a.status === "preparing").length },
+            { href: "/insights", label: "Insights" },
             { href: "/profile", label: "Knowledge base" },
             { href: "/settings", label: "Job sources" },
           ]}
