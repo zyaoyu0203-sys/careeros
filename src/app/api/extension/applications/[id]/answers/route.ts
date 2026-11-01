@@ -13,7 +13,7 @@ const Body = z.object({
         id: z.number().int(),
         label: z.string().max(400),
         kind: z.enum(["text", "long", "select", "choice"]),
-        options: z.array(z.string().max(200)).max(100),
+        options: z.array(z.string().max(200)).max(400),
         required: z.boolean(),
       }),
     )

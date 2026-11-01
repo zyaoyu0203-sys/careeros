@@ -17,8 +17,16 @@
   const panel = document.createElement("div");
   panel.id = "careeros-panel";
   panel.innerHTML = `<div class="cos-head"><span class="cos-mark">C</span><b>CareerOS</b><button class="cos-x" title="Hide">×</button></div><div class="cos-body"></div>`;
-  panel.querySelector(".cos-x").onclick = () => panel.remove();
+  panel.querySelector(".cos-x").onclick = () => ((panelWanted = false), panel.remove());
   const body = panel.querySelector(".cos-body");
+  // React-rendered boards (the newer Greenhouse) can re-render the whole document after load and
+  // drop nodes they didn't create; put the panel back whenever that happens, unless the user closed it.
+  let panelWanted = false;
+  const showPanel = () => {
+    panelWanted = true;
+    if (!panel.isConnected) document.body.appendChild(panel);
+  };
+  setInterval(() => panelWanted && !panel.isConnected && document.body.appendChild(panel), 800);
   const render = html => (body.innerHTML = html);
   const escape = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -56,13 +64,24 @@
   const isCombobox = el => el.getAttribute("role") === "combobox" || el.getAttribute("aria-autocomplete") === "list";
   const isRequired = (el, label) => el.required || el.getAttribute("aria-required") === "true" || /\*/.test(label);
 
+  // The options of *this* dropdown: its listbox (aria-controls) or the menu inside its own select.
+  const selectRoot = el => el.closest("[class*='__control' i], [class*='-control' i]")?.parentElement ?? el.parentElement?.parentElement ?? el;
+  function optionNodes(el) {
+    const listbox = document.getElementById(el.getAttribute("aria-controls") || el.getAttribute("aria-owns") || "");
+    return [...(listbox ?? selectRoot(el)).querySelectorAll("[role=option]")];
+  }
+  async function closeMenu(el) {
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    el.blur();
+    await sleep(120);
+  }
+
   async function comboboxOptions(el) {
     el.focus();
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
-    await sleep(250);
-    const options = [...document.querySelectorAll("[role=option]")].map(o => clean(o.textContent)).filter(Boolean).slice(0, 80);
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
-    el.blur();
+    await sleep(300);
+    const options = optionNodes(el).map(o => clean(o.textContent)).filter(Boolean).slice(0, 400);
+    await closeMenu(el);
     return options;
   }
 
@@ -82,7 +101,7 @@
   }
 
   // React-select shows the chosen value in a sibling element, not in the input itself.
-  const hasChoice = el => Boolean(el.closest("[class*='container' i], [class*='select' i]")?.querySelector("[class*='singleValue' i], [class*='single-value' i]"));
+  const hasChoice = el => Boolean(selectRoot(el).querySelector("[class*='singleValue' i], [class*='single-value' i], [class*='multiValue' i], [class*='multi-value' i]"));
 
   // ---------- writing ----------
   function setValue(el, value) {
@@ -106,19 +125,34 @@
       setValue(el, option.value);
     } else if (kind === "choice") {
       el.focus();
-      setValue(el, answer);
+      el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+      setValue(el, answer); // filters long lists, where supported
       await sleep(350);
-      const options = [...document.querySelectorAll("[role=option]")];
-      const target = bestOption(options.map(o => clean(o.textContent)), answer);
+      let options = optionNodes(el);
+      let target = bestOption(options.map(o => clean(o.textContent)), answer);
+      if (!target) {
+        // Some boards don't filter by typing: clear the text and pick from the full list.
+        setValue(el, "");
+        await sleep(250);
+        options = optionNodes(el);
+        target = bestOption(options.map(o => clean(o.textContent)), answer);
+      }
       const node = options.find(o => clean(o.textContent) === target);
       if (!node) {
         setValue(el, "");
-        el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+        await closeMenu(el);
         return false;
       }
+      node.scrollIntoView({ block: "nearest" });
       node.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
       node.click();
-      await sleep(100);
+      await sleep(150);
+      if (!hasChoice(el)) {
+        await closeMenu(el);
+        return false; // the dropdown didn't accept it — leave it for the user
+      }
+      selectRoot(el).classList.add("careeros-filled");
+      return true;
     } else {
       setValue(el, answer);
     }
@@ -197,7 +231,7 @@
       if (!urlSaysDone && !text) return;
       sessionStorage.setItem(REPORTED_KEY, appId);
       const res = await send({ type: "submitted", appId, confirmationUrl: location.href, confirmationText: text ?? "" });
-      document.body.appendChild(panel);
+      showPanel();
       render(res?.ok ? `<p class="cos-ok">✓ Application recorded in CareerOS.</p>` : `<p class="cos-err">Couldn't record the application: ${escape(res?.error)}</p>`);
     };
     new MutationObserver(check).observe(document.body, { childList: true, subtree: true });
@@ -247,7 +281,7 @@
     watchForConfirmation();
     if (sessionStorage.getItem(REPORTED_KEY) === appId) return;
     if (!hasForm() && !appId) return; // a listing page, not an application form
-    document.body.appendChild(panel);
+    showPanel();
     render(`<p class="cos-muted">Connecting…</p>`);
     (appId ? showApplication() : chooseApplication()).catch(e => render(`<p class="cos-err">${escape(e.message)}</p>`));
   }
