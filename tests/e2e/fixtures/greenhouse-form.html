@@ -1,0 +1,30 @@
+<!doctype html>
+<!-- A stand-in for a Greenhouse application form, served at a boards.greenhouse.io URL by the test. -->
+<html lang="en">
+  <head><meta charset="utf-8" /><title>Job Application for Product Analyst Intern at Harbour Fintech</title></head>
+  <body>
+    <main>
+      <h1>Product Analyst Intern</h1>
+      <form id="application_form">
+        <div class="field"><label for="first_name">First Name *</label><input id="first_name" name="first_name" /></div>
+        <div class="field"><label for="last_name">Last Name *</label><input id="last_name" name="last_name" /></div>
+        <div class="field"><label for="email">Email *</label><input id="email" type="email" name="email" /></div>
+        <div class="field"><label for="phone">Phone</label><input id="phone" name="phone" /></div>
+        <div class="field"><label for="linkedin">LinkedIn Profile</label><input id="linkedin" name="linkedin" /></div>
+        <div class="field">
+          <label for="sponsor">Will you now or in the future require visa sponsorship?</label>
+          <select id="sponsor"><option value="">Select…</option><option value="1">Yes</option><option value="0">No</option></select>
+        </div>
+        <div class="field"><label for="why">Why are you interested in AI products?</label><textarea id="why"></textarea></div>
+        <div class="field"><label for="resume">Resume/CV *</label><input id="resume" type="file" name="resume" /></div>
+        <button type="submit">Submit application</button>
+      </form>
+    </main>
+    <script>
+      document.getElementById("application_form").addEventListener("submit", e => {
+        e.preventDefault();
+        document.querySelector("main").innerHTML = "<h1>Thank you for applying.</h1><p>Your application has been received.</p>";
+      });
+    </script>
+  </body>
+</html>

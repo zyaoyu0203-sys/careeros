@@ -1,7 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth", "/api/cron"];
+// API routes under /api/extension authenticate with their own bearer token.
+const PUBLIC_PATHS = ["/login", "/auth", "/api/cron", "/api/extension"];
 
 export async function middleware(request: NextRequest) {
   // Without Supabase the app runs in single-user local mode.

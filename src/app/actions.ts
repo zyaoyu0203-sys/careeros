@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { aiAvailable, importResumeText, tailorResume, writeCoverLetter } from "@/lib/ai/claude";
 import { getPreferences, getProfile, newId } from "@/lib/data";
 import { addManualJob, chooseResumeVersion, runDiscovery } from "@/lib/discovery";
+import { issueExtensionToken } from "@/lib/extension-auth";
 import { buildResumeContent, newVersion } from "@/lib/resume";
 import { requireUserId } from "@/lib/session";
 import { store, supabaseConfigured } from "@/lib/store";
@@ -343,3 +344,41 @@ export async function signOut(): Promise<void> {
   redirect("/login");
 }
 
+
+// ---------- One-click apply (with the browser extension) ----------
+
+/**
+ * Creates (or reuses) the application for a job with the chosen resume and returns the URL the
+ * client should open. The `#careeros-app` fragment tells the extension which application it is filling.
+ */
+export async function startOneClickApply(jobId: string, resumeId: string): Promise<{ ok: true; appId: string; applyUrl: string } | { ok: false; error: string }> {
+  try {
+    const userId = await requireUserId();
+    const db = store();
+    const [job, apps] = await Promise.all([db.get(userId, "jobs", jobId), db.list(userId, "applications")]);
+    if (!job?.url) return { ok: false, error: "This role has no application link" };
+    const now = new Date().toISOString();
+    const existing = apps.find(a => a.jobId === jobId);
+    const app: Application = existing
+      ? { ...existing, resumeId, updatedAt: now }
+      : {
+          id: newId("app"), jobId, company: job.company, title: job.title, url: job.url, resumeId, status: "preparing", appliedAt: null,
+          notes: "", coverLetter: "", history: [{ status: "preparing", at: now }], createdAt: now, updatedAt: now,
+        };
+    await db.put(userId, "applications", app.id, app);
+    if (job.status !== "applying") await db.put(userId, "jobs", jobId, { ...job, status: "applying" });
+    revalidatePath("/", "layout");
+    return { ok: true, appId: app.id, applyUrl: `${job.url.replace(/#.*$/, "")}#careeros-app=${app.id}` };
+  } catch (error) {
+    return fail(error) as { ok: false; error: string };
+  }
+}
+
+export async function createExtensionToken(): Promise<{ ok: true; token: string } | { ok: false; error: string }> {
+  try {
+    const userId = await requireUserId();
+    return { ok: true, token: await issueExtensionToken(userId) };
+  } catch (error) {
+    return fail(error) as { ok: false; error: string };
+  }
+}

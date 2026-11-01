@@ -74,6 +74,7 @@ export type Preferences = {
   frequency: "daily" | "weekly" | "manual";
   lastRunAt: string | null;
   lastRunSummary: string | null;
+  extensionTokenHash?: string; // SHA-256 of the browser-extension token
 };
 
 export type JobStatus = "new" | "saved" | "dismissed" | "applying";

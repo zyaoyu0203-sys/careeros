@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "CareerOS Apply Assistant",
+  "version": "1.0.0",
+  "description": "Fills job application forms from your CareerOS knowledge base and records the application after you submit.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*.vercel.app/*", "http://localhost/*"],
+  "background": { "service_worker": "background.js" },
+  "options_page": "options.html",
+  "action": { "default_title": "CareerOS settings", "default_popup": "options.html" },
+  "content_scripts": [
+    {
+      "matches": ["https://*.greenhouse.io/*", "https://jobs.lever.co/*", "https://jobs.ashbyhq.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

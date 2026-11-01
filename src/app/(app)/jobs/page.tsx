@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prepareApplication, setJobStatus, tailorForJob } from "@/app/actions";
 import { ActionButton } from "@/components/action-button";
+import { OneClickApply } from "@/components/one-click-apply";
 import { SearchButton } from "@/components/search-button";
 import { Badge, Button, Card, CompanyMark, EmptyState, LinkButton, PageHeader, ScorePill, buttonClass, cx, formatDate, relativeDays } from "@/components/ui";
 import { aiAvailable } from "@/lib/ai/claude";
@@ -147,14 +148,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               </li>
             ))}
           </ul>
-          {selected ? <JobDetail job={selected} resumeName={resumes.find(r => r.id === selected.suggestedResumeId)?.name} hasTailored={resumes.some(r => r.jobId === selected.id)} tailoredId={resumes.find(r => r.jobId === selected.id)?.id} /> : <div />}
+          {selected ? <JobDetail versions={resumes.filter(r => r.kind === "version").map(r => ({ id: r.id, name: r.name }))} job={selected} resumeName={resumes.find(r => r.id === selected.suggestedResumeId)?.name} hasTailored={resumes.some(r => r.jobId === selected.id)} tailoredId={resumes.find(r => r.jobId === selected.id)?.id} /> : <div />}
         </div>
       )}
     </>
   );
 }
 
-function JobDetail({ job, resumeName, hasTailored, tailoredId }: { job: Job; resumeName?: string; hasTailored: boolean; tailoredId?: string }) {
+function JobDetail({ job, versions, resumeName, hasTailored, tailoredId }: { job: Job; versions: { id: string; name: string }[]; resumeName?: string; hasTailored: boolean; tailoredId?: string }) {
   const ai = aiAvailable();
   return (
     <article className="max-h-[78vh] overflow-y-auto px-6 py-6 sm:px-8">
@@ -219,8 +220,9 @@ function JobDetail({ job, resumeName, hasTailored, tailoredId }: { job: Job; res
       </div>
 
       <div className="mt-6 flex flex-wrap items-start gap-2 rounded-[4px] border border-navy-900 bg-blue-50 p-4">
+        {job.url && job.status !== "applying" && <OneClickApply jobId={job.id} company={job.company} versions={versions} suggestedId={job.suggestedResumeId} />}
         <form action={prepareApplication.bind(null, job.id)}>
-          <Button>
+          <Button variant={job.url && job.status !== "applying" ? "secondary" : "primary"}>
             <Send size={16} /> {job.status === "applying" ? "Open application pack" : "Prepare application"}
           </Button>
         </form>

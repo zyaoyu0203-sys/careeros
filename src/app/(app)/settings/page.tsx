@@ -3,6 +3,7 @@ import { PageHeader, formatDate } from "@/components/ui";
 import { getPreferences, listRuns } from "@/lib/data";
 import { requireUserId } from "@/lib/session";
 import { googleJobsAvailable } from "@/lib/sources";
+import { ExtensionCard } from "./extension-card";
 import { RunHistory } from "./run-history";
 import { SettingsForm } from "./settings-form";
 
@@ -23,6 +24,7 @@ export default async function SettingsPage() {
         }
       />
       <SettingsForm initial={prefs} googleJobsAvailable={googleJobsAvailable()} />
+      <ExtensionCard hasToken={Boolean(prefs.extensionTokenHash)} />
       <RunHistory runs={runs} />
     </>
   );

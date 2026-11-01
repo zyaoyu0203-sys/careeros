@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CareerOS Apply Assistant</title>
+    <style>
+      body { width: 340px; margin: 0; padding: 18px; font: 14px/1.5 system-ui, sans-serif; color: #0f1b2d; }
+      h1 { margin: 0 0 4px; font-size: 17px; color: #0b2545; }
+      p { margin: 0 0 14px; color: #5d6c80; font-size: 13px; }
+      label { display: grid; gap: 4px; margin-bottom: 12px; font-size: 13px; font-weight: 600; color: #33435a; }
+      input { height: 34px; padding: 0 10px; border: 1px solid #dbe3ee; border-radius: 3px; font: inherit; }
+      button { height: 36px; width: 100%; border: 0; border-radius: 3px; background: #13315c; color: #fff; font: 600 14px system-ui; cursor: pointer; }
+      #status { margin-top: 10px; font-size: 13px; }
+      .ok { color: #1f7a52; } .err { color: #c2410c; }
+    </style>
+  </head>
+  <body>
+    <h1>CareerOS Apply Assistant</h1>
+    <p>Generate a token in CareerOS → Job sources → Browser extension.</p>
+    <label>CareerOS address <input id="baseUrl" placeholder="https://careeros-mocha-kappa.vercel.app" /></label>
+    <label>Extension token <input id="token" type="password" placeholder="cos_…" /></label>
+    <button id="save">Save and test connection</button>
+    <div id="status"></div>
+    <script src="options.js"></script>
+  </body>
+</html>

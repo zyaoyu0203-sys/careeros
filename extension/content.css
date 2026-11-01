@@ -1,0 +1,25 @@
+#careeros-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 2147483647;
+  width: 300px;
+  border: 1px solid #0b2545;
+  border-radius: 4px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(11, 37, 69, 0.22);
+  font: 14px/1.45 system-ui, -apple-system, sans-serif;
+  color: #0f1b2d;
+}
+#careeros-panel .cos-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #0b2545; color: #fff; border-radius: 3px 3px 0 0; }
+#careeros-panel .cos-mark { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 2px; background: #fff; color: #0b2545; font: 600 14px Georgia, serif; }
+#careeros-panel .cos-x { margin-left: auto; border: 0; background: none; color: #fff; font-size: 18px; cursor: pointer; }
+#careeros-panel .cos-body { padding: 12px 14px 14px; }
+#careeros-panel p { margin: 0 0 8px; }
+#careeros-panel .cos-title { font-weight: 600; }
+#careeros-panel .cos-title span, #careeros-panel .cos-muted { color: #5d6c80; font-weight: 400; font-size: 13px; }
+#careeros-panel .cos-ok { color: #1f7a52; font-weight: 600; }
+#careeros-panel .cos-err { color: #c2410c; font-size: 13px; }
+#careeros-panel .cos-btn, #careeros-panel .cos-pick { display: block; width: 100%; margin-top: 6px; padding: 9px 10px; border: 1px solid #13315c; border-radius: 3px; background: #13315c; color: #fff; font: 600 14px system-ui; text-align: left; cursor: pointer; }
+#careeros-panel .cos-pick { background: #fff; color: #13315c; font-weight: 500; }
+.careeros-filled { outline: 2px solid #3b74c4 !important; outline-offset: 1px; }

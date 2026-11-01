@@ -85,9 +85,9 @@ export default async function ApplicationPackPage({ params }: { params: Promise<
                 />
               </div>
               {resume && (
-                <Link href={`/print/resume/${resume.id}`} target="_blank" className={buttonClass("secondary")}>
+                <a href={`/api/resumes/${resume.id}/pdf`} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
                   <Printer size={16} /> Open PDF
-                </Link>
+                </a>
               )}
             </div>
             <p className="mt-2 text-[13px] text-muted">Open the PDF, save it, and upload it on the application form.</p>
@@ -120,11 +120,11 @@ export default async function ApplicationPackPage({ params }: { params: Promise<
 
           <Step n={4} title="Submit on the employer's site" done={app.status !== "preparing"}>
             <p className="mb-3 text-[14px] text-ink-soft">
-              CareerOS never submits for you. Open the posting, complete the form with the answers above, then record it here.
+              CareerOS never submits for you. With the browser extension, the form is filled and your resume attached automatically; you review it and press Submit, and the application is recorded here. Without it, copy the answers above and record it yourself.
             </p>
             <div className="flex flex-wrap gap-2">
               {app.url && (
-                <a href={app.url} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
+                <a href={`${app.url.replace(/#.*$/, "")}#careeros-app=${app.id}`} target="_blank" rel="noreferrer" className={buttonClass("secondary")}>
                   <ExternalLink size={16} /> Open application page
                 </a>
               )}
