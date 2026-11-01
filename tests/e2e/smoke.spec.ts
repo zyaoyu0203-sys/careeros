@@ -57,3 +57,27 @@ test("AI failures degrade to a message instead of breaking the page", async ({ p
   await expect(page.locator("body")).not.toContainText(BROKEN);
   expect(errors).toEqual([]);
 });
+
+test("saving or dismissing a role keeps it open and can be undone", async ({ page }) => {
+  await page.goto("/jobs/new");
+  await page.getByLabel("Company").fill("Keep Open Co");
+  await page.getByLabel("Job title").fill("Product Intern");
+  await page.getByLabel("Link to the posting").fill("https://example.com/jobs/keep");
+  await page.getByLabel("Job description").fill("Product work.");
+  await page.getByRole("button", { name: "Add and score" }).click();
+  // Added roles start saved; move it to New so the full cycle can be exercised.
+  await page.getByRole("button", { name: "Saved" }).click();
+  const title = page.getByRole("heading", { name: "Product Intern", level: 2 });
+
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(title).toBeVisible();
+  await expect(page.getByText("✓ In your Saved list")).toBeVisible();
+
+  await page.getByRole("button", { name: "Dismiss" }).click();
+  await expect(title).toBeVisible();
+  await expect(page.getByText("Hidden from New")).toBeVisible();
+
+  await page.getByRole("button", { name: "Undo dismiss" }).click();
+  await expect(title).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+});

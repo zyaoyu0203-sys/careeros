@@ -1,4 +1,4 @@
-import { Bookmark, ExternalLink, EyeOff, FileText, Plus, Send, ShieldAlert, Sparkles, ThumbsUp, Undo2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, EyeOff, FileText, Plus, Send, ShieldAlert, Sparkles, ThumbsUp, Undo2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prepareApplication, setJobStatus, tailorForJob } from "@/app/actions";
@@ -148,14 +148,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               </li>
             ))}
           </ul>
-          {selected ? <JobDetail versions={resumes.filter(r => r.kind === "version").map(r => ({ id: r.id, name: r.name }))} job={selected} resumeName={resumes.find(r => r.id === selected.suggestedResumeId)?.name} hasTailored={resumes.some(r => r.jobId === selected.id)} tailoredId={resumes.find(r => r.jobId === selected.id)?.id} /> : <div />}
+          {selected ? <JobDetail view={view} versions={resumes.filter(r => r.kind === "version").map(r => ({ id: r.id, name: r.name }))} job={selected} resumeName={resumes.find(r => r.id === selected.suggestedResumeId)?.name} hasTailored={resumes.some(r => r.jobId === selected.id)} tailoredId={resumes.find(r => r.jobId === selected.id)?.id} /> : <div />}
         </div>
       )}
     </>
   );
 }
 
-function JobDetail({ job, versions, resumeName, hasTailored, tailoredId }: { job: Job; versions: { id: string; name: string }[]; resumeName?: string; hasTailored: boolean; tailoredId?: string }) {
+function JobDetail({ job, view, versions, resumeName, hasTailored, tailoredId }: { job: Job; view: string; versions: { id: string; name: string }[]; resumeName?: string; hasTailored: boolean; tailoredId?: string }) {
   const ai = aiAvailable();
   return (
     <article className="max-h-[78vh] overflow-y-auto px-6 py-6 sm:px-8">
@@ -168,27 +168,45 @@ function JobDetail({ job, versions, resumeName, hasTailored, tailoredId }: { job
             {job.postedAt ? ` · posted ${/^\d{4}-/.test(job.postedAt) ? formatDate(job.postedAt) : job.postedAt}` : ""}
           </p>
         </div>
-        <div className="flex shrink-0 gap-2">
-          {job.status === "dismissed" || job.status === "saved" ? (
-            <form action={setJobStatus.bind(null, job.id, "new")}>
-              <Button variant="ghost" size="sm">
-                <Undo2 size={15} /> Move to new
-              </Button>
-            </form>
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          {job.status === "applying" ? (
+            <Badge tone="blue">Application in progress</Badge>
           ) : (
-            <form action={setJobStatus.bind(null, job.id, "saved")}>
-              <Button variant="secondary" size="sm">
-                <Bookmark size={15} /> Save
-              </Button>
-            </form>
+            <div className="flex gap-2">
+              {job.status === "saved" ? (
+                <form action={setJobStatus.bind(null, job.id, "new", view)}>
+                  <Button variant="primary" size="sm" title="Remove from Saved">
+                    <BookmarkCheck size={15} /> Saved
+                  </Button>
+                </form>
+              ) : job.status === "new" ? (
+                <form action={setJobStatus.bind(null, job.id, "saved", view)}>
+                  <Button variant="secondary" size="sm">
+                    <Bookmark size={15} /> Save
+                  </Button>
+                </form>
+              ) : null}
+              {job.status === "dismissed" ? (
+                <form action={setJobStatus.bind(null, job.id, "new", view)}>
+                  <Button variant="secondary" size="sm">
+                    <Undo2 size={15} /> Undo dismiss
+                  </Button>
+                </form>
+              ) : (
+                <form action={setJobStatus.bind(null, job.id, "dismissed", view)}>
+                  <Button variant="ghost" size="sm">
+                    <EyeOff size={15} /> Dismiss
+                  </Button>
+                </form>
+              )}
+            </div>
           )}
-          {job.status !== "dismissed" && (
-            <form action={setJobStatus.bind(null, job.id, "dismissed")}>
-              <Button variant="ghost" size="sm">
-                <EyeOff size={15} /> Dismiss
-              </Button>
-            </form>
+          {job.status === "saved" && (
+            <Link href={`/jobs?view=saved&id=${job.id}`} className="text-[12.5px] text-green-600 hover:underline">
+              ✓ In your Saved list
+            </Link>
           )}
+          {job.status === "dismissed" && <span className="text-[12.5px] text-muted">Hidden from New</span>}
         </div>
       </div>
 

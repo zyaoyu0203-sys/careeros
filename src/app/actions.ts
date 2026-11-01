@@ -134,13 +134,15 @@ export async function addJob(formData: FormData): Promise<void> {
   redirect(`/jobs?id=${job.id}&view=saved`);
 }
 
-export async function setJobStatus(jobId: string, status: JobStatus): Promise<void> {
+/** Saves, dismisses or restores a role, then keeps it open in the list the user was looking at. */
+export async function setJobStatus(jobId: string, status: JobStatus, view = "new"): Promise<void> {
   const userId = await requireUserId();
   const db = store();
   const job = await db.get(userId, "jobs", jobId);
   if (!job) return;
   await db.put(userId, "jobs", jobId, { ...job, status });
   revalidatePath("/", "layout");
+  redirect(`/jobs?view=${encodeURIComponent(view)}&id=${encodeURIComponent(jobId)}`);
 }
 
 // ---------- Resumes ----------
