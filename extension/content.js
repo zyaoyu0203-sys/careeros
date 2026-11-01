@@ -22,38 +22,107 @@
   const render = html => (body.innerHTML = html);
   const escape = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
-  // ---------- labels ----------
+  // ---------- reading the form ----------
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const clean = t => (t ?? "").replace(/\*/g, " ").replace(/\s+/g, " ").trim();
+  const CONTROL = "input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]):not([type=submit]):not([type=button]), textarea, select";
+
+  /**
+   * The question a control asks. Explicit associations first (label[for], aria-labelledby,
+   * a wrapping label, aria-label); only then the nearest container that holds this one control.
+   * Never a wide container — that is how every field ends up labelled "First Name".
+   */
   function labelFor(el) {
-    const parts = [];
-    if (el.id) document.querySelectorAll(`label[for="${CSS.escape(el.id)}"]`).forEach(l => parts.push(l.textContent));
+    const byFor = el.id ? [...document.querySelectorAll(`label[for="${CSS.escape(el.id)}"]`)].map(l => l.textContent).join(" ") : "";
+    if (clean(byFor)) return clean(byFor);
+    const ids = el.getAttribute("aria-labelledby");
+    if (ids) {
+      const text = ids.split(/\s+/).map(id => document.getElementById(id)?.textContent ?? "").join(" ");
+      if (clean(text)) return clean(text);
+    }
     const wrapping = el.closest("label");
-    if (wrapping) parts.push(wrapping.textContent);
-    const labelledBy = el.getAttribute("aria-labelledby");
-    if (labelledBy) labelledBy.split(/\s+/).forEach(id => parts.push(document.getElementById(id)?.textContent ?? ""));
-    parts.push(el.getAttribute("aria-label") ?? "", el.getAttribute("placeholder") ?? "");
-    // Lever and Ashby put the question text in a sibling element of the field's container.
-    const container = el.closest(".application-question, .field, [class*='fieldEntry'], [class*='question'], li, fieldset");
-    const caption = container?.querySelector(".application-label, legend, label, [class*='label'], [class*='Label']");
-    if (caption) parts.push(caption.textContent);
-    if (!parts.join("").trim()) parts.push(el.name ?? "", el.id ?? "");
-    return parts.join(" ").replace(/\s+/g, " ").trim();
+    if (wrapping && clean(wrapping.textContent)) return clean(wrapping.textContent);
+    if (clean(el.getAttribute("aria-label"))) return clean(el.getAttribute("aria-label"));
+    let node = el.parentElement;
+    for (let depth = 0; node && depth < 5; depth++, node = node.parentElement) {
+      const controls = [...node.querySelectorAll(CONTROL)].filter(c => c.offsetParent !== null);
+      if (controls.length > 1) break; // reached a container shared with other questions
+      const caption = node.querySelector("label, legend, .application-label, [class*='label' i]");
+      if (caption && clean(caption.textContent)) return clean(caption.textContent);
+    }
+    return clean(el.getAttribute("placeholder") || el.name || "");
   }
 
-  // ---------- filling ----------
+  const isCombobox = el => el.getAttribute("role") === "combobox" || el.getAttribute("aria-autocomplete") === "list";
+  const isRequired = (el, label) => el.required || el.getAttribute("aria-required") === "true" || /\*/.test(label);
+
+  async function comboboxOptions(el) {
+    el.focus();
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
+    await sleep(250);
+    const options = [...document.querySelectorAll("[role=option]")].map(o => clean(o.textContent)).filter(Boolean).slice(0, 80);
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+    el.blur();
+    return options;
+  }
+
+  async function readFields() {
+    const fields = [];
+    for (const el of document.querySelectorAll(CONTROL)) {
+      if (el.disabled || el.readOnly || el.offsetParent === null || el.closest("#careeros-panel")) continue;
+      const label = labelFor(el);
+      if (!label) continue;
+      const kind = el.tagName === "SELECT" ? "select" : isCombobox(el) ? "choice" : el.tagName === "TEXTAREA" ? "long" : "text";
+      const filled = kind === "select" ? Boolean(el.value) : kind === "choice" ? hasChoice(el) : Boolean(el.value.trim());
+      if (filled) continue; // never overwrite what's there
+      const options = kind === "select" ? [...el.options].map(o => clean(o.text)).filter(t => t && !/^select/i.test(t)) : kind === "choice" ? await comboboxOptions(el) : [];
+      fields.push({ el, label, kind, options, required: isRequired(el, label) });
+    }
+    return fields;
+  }
+
+  // React-select shows the chosen value in a sibling element, not in the input itself.
+  const hasChoice = el => Boolean(el.closest("[class*='container' i], [class*='select' i]")?.querySelector("[class*='singleValue' i], [class*='single-value' i]"));
+
+  // ---------- writing ----------
   function setValue(el, value) {
     const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : el instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
     Object.getOwnPropertyDescriptor(proto, "value").set.call(el, value); // works with React-controlled inputs
     el.dispatchEvent(new Event("input", { bubbles: true }));
     el.dispatchEvent(new Event("change", { bubbles: true }));
-    el.dispatchEvent(new Event("blur", { bubbles: true }));
-    el.classList.add("careeros-filled");
   }
 
-  function fillSelect(el, value) {
-    const want = value.toLowerCase();
-    const option = [...el.options].find(o => o.text.trim().toLowerCase() === want) ?? [...el.options].find(o => o.text.trim().toLowerCase().startsWith(want.slice(0, 3)));
-    if (!option) return false;
-    setValue(el, option.value);
+  const bestOption = (options, answer) => {
+    const want = clean(answer).toLowerCase();
+    return options.find(o => o.toLowerCase() === want) ?? options.find(o => o.toLowerCase().startsWith(want)) ?? options.find(o => want && o.toLowerCase().includes(want)) ?? null;
+  };
+
+  async function fillOne(field, answer) {
+    const { el, kind } = field;
+    if (!answer) return false;
+    if (kind === "select") {
+      const option = [...el.options].find(o => clean(o.text) === bestOption(field.options, answer));
+      if (!option) return false;
+      setValue(el, option.value);
+    } else if (kind === "choice") {
+      el.focus();
+      setValue(el, answer);
+      await sleep(350);
+      const options = [...document.querySelectorAll("[role=option]")];
+      const target = bestOption(options.map(o => clean(o.textContent)), answer);
+      const node = options.find(o => clean(o.textContent) === target);
+      if (!node) {
+        setValue(el, "");
+        el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
+        return false;
+      }
+      node.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+      node.click();
+      await sleep(100);
+    } else {
+      setValue(el, answer);
+    }
+    (el.closest("[class*='container' i]") ?? el).classList.add("careeros-filled");
     return true;
   }
 
@@ -70,25 +139,36 @@
     return bestScore >= 0.6 ? best.answer : null;
   }
 
-  function fillFields(pack) {
+  /**
+   * Two passes: fixed rules and saved answers for the predictable fields, then the model for
+   * whatever is left — it sees the question and, for dropdowns, the allowed options.
+   */
+  async function fillForm(pack, progress) {
     const rules = pack.rules.map(r => ({ re: new RegExp(r.pattern, r.flags), key: r.key }));
-    const filled = [];
-    const fields = document.querySelectorAll("input:not([type=hidden]):not([type=file]):not([type=checkbox]):not([type=radio]):not([type=submit]), textarea, select");
-    for (const el of fields) {
-      if (el.disabled || el.readOnly || el.offsetParent === null) continue;
-      if (el.tagName !== "SELECT" && el.value.trim()) continue; // never overwrite what's there
-      const label = labelFor(el);
-      if (!label) continue;
-      const rule = rules.find(r => r.re.test(label));
-      let value = rule ? pack.answers[rule.key] : null;
-      if (!value && el.tagName === "TEXTAREA") {
-        value = /cover letter/i.test(label) ? pack.coverLetter : customAnswer(label, pack.custom);
-      }
-      if (!value) continue;
-      const ok = el.tagName === "SELECT" ? fillSelect(el, value) : (setValue(el, value), true);
-      if (ok) filled.push(label.slice(0, 60));
+    const fields = await readFields();
+    let byRule = 0;
+    const open = [];
+    for (const field of fields) {
+      const rule = rules.find(r => r.re.test(field.label));
+      const answer = (rule && pack.answers[rule.key]) || customAnswer(field.label, pack.custom) || (/cover letter/i.test(field.label) ? pack.coverLetter : null);
+      if (await fillOne(field, answer)) byRule++;
+      else open.push(field);
     }
-    return filled;
+
+    let byAi = 0;
+    if (open.length) {
+      progress(`Asking AI about ${open.length} remaining question${open.length === 1 ? "" : "s"}…`);
+      const res = await send({
+        type: "answers",
+        appId,
+        fields: open.map((f, i) => ({ id: i, label: f.label.slice(0, 300), kind: f.kind, options: f.options, required: f.required })),
+      });
+      if (res?.ok) {
+        for (const { id, answer } of res.data.answers) if (open[id] && (await fillOne(open[id], answer))) (byAi++, (open[id].done = true));
+      }
+    }
+    const left = open.filter(f => !f.done && f.required).map(f => f.label);
+    return { byRule, byAi, left };
   }
 
   async function attachResume(pack) {
@@ -135,13 +215,15 @@
       <p class="cos-muted">Resume: <b>${escape(pack.resume?.name ?? "none")}</b></p>
       <button class="cos-btn">Fill application</button>`);
     body.querySelector(".cos-btn").onclick = async () => {
-      render(`<p class="cos-muted">Filling…</p>`);
-      const filled = fillFields(pack);
+      render(`<p class="cos-muted">Reading the form…</p>`);
+      const progress = text => render(`<p class="cos-muted">${escape(text)}</p>`);
+      const { byRule, byAi, left } = await fillForm(pack, progress);
       const resumeProblem = await attachResume(pack);
       render(`
-        <p class="cos-ok">✓ Filled ${filled.length} field${filled.length === 1 ? "" : "s"}${resumeProblem ? "" : " and attached your resume"}.</p>
+        <p class="cos-ok">✓ Filled ${byRule + byAi} field${byRule + byAi === 1 ? "" : "s"}${byAi ? ` (${byAi} answered by AI from your profile)` : ""}${resumeProblem ? "" : " and attached your resume"}.</p>
         ${resumeProblem ? `<p class="cos-err">${escape(resumeProblem)}</p>` : ""}
-        <p class="cos-muted">Filled fields are outlined in blue. Check them, answer anything left, then press <b>Submit</b> on the form. CareerOS will record it automatically.</p>`);
+        ${left.length ? `<p class="cos-err">Needs your answer:</p><ul class="cos-list">${left.map(l => `<li>${escape(l.slice(0, 80))}</li>`).join("")}</ul>` : ""}
+        <p class="cos-muted">Filled fields are outlined in blue. Check them, then press <b>Submit</b> on the form. CareerOS will record it automatically.</p>`);
     };
   }
 

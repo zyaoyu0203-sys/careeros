@@ -1,14 +1,16 @@
 // Service worker: the only part of the extension that talks to CareerOS. Content scripts send it
 // messages, so the token never touches the employer's page.
 
+const DEFAULT_BASE_URL = "https://careeros-mocha-kappa.vercel.app";
+
 async function settings() {
   const { baseUrl = "", token = "" } = await chrome.storage.local.get(["baseUrl", "token"]);
-  return { baseUrl: baseUrl.replace(/\/$/, ""), token };
+  return { baseUrl: (baseUrl || DEFAULT_BASE_URL).replace(/\/$/, ""), token };
 }
 
 async function api(path, { method = "GET", body } = {}) {
   const { baseUrl, token } = await settings();
-  if (!baseUrl || !token) throw new Error("Open the extension settings and add your CareerOS address and token.");
+  if (!token) throw new Error("Paste your extension token (CareerOS → Job sources → Browser extension).");
   const res = await fetch(`${baseUrl}${path}`, {
     method,
     headers: { Authorization: `Bearer ${token}`, ...(body ? { "Content-Type": "application/json" } : {}) },
@@ -37,6 +39,9 @@ const handlers = {
   },
   async resume({ path }) {
     return { base64: toBase64(await (await api(path)).arrayBuffer()) };
+  },
+  async answers({ appId, fields }) {
+    return (await api(`/api/extension/applications/${encodeURIComponent(appId)}/answers`, { method: "POST", body: { fields } })).json();
   },
   async submitted({ appId, confirmationUrl, confirmationText }) {
     return (await api(`/api/extension/applications/${encodeURIComponent(appId)}/submitted`, { method: "POST", body: { confirmationUrl, confirmationText } })).json();

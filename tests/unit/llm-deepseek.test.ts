@@ -57,3 +57,35 @@ describe("DeepSeek provider", () => {
     expect(JSON.parse(fetchMock.mock.calls[1][1].body).response_format).toBeUndefined();
   });
 });
+
+describe("answerFormFields", () => {
+  it("keeps only answers that are allowed options or free text, and drops unknown fields", async () => {
+    const { answerFormFields } = await import("@/lib/ai/llm");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        reply(
+          JSON.stringify({
+            answers: [
+              { id: 0, answer: "Hong Kong" }, // allowed option
+              { id: 1, answer: "Maybe" }, // not an option → dropped
+              { id: 2, answer: "I built an LLM pipeline." }, // free text
+              { id: 3, answer: null }, // unknown → left for the user
+              { id: 99, answer: "ghost" }, // no such field → dropped
+            ],
+          }),
+        ),
+      ),
+    );
+    const answers = await answerFormFields(profile(), { company: "Acme", title: "Intern" }, [
+      { id: 0, label: "Where do you live?", kind: "choice", options: ["Hong Kong", "Singapore"], required: true },
+      { id: 1, label: "Need sponsorship?", kind: "choice", options: ["Yes", "No"], required: true },
+      { id: 2, label: "Describe your AI experience", kind: "long", options: [], required: true },
+      { id: 3, label: "Desired salary", kind: "text", options: [], required: false },
+    ]);
+    expect(answers).toEqual([
+      { id: 0, answer: "Hong Kong" },
+      { id: 2, answer: "I built an LLM pipeline." },
+    ]);
+  });
+});

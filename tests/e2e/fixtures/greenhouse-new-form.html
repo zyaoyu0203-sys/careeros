@@ -1,0 +1,64 @@
+<!doctype html>
+<!-- Mimics the newer Greenhouse boards (job-boards.greenhouse.io): every question sits in its own
+     wrapper inside one big form, and dropdowns are searchable comboboxes, not <select>s. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job Application for AI Product Intern at Northwind</title>
+    <style>
+      .field-wrapper { margin: 12px 0; } .select__menu { border: 1px solid #ccc; } .select__menu[hidden] { display: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h2>Apply for this job</h2>
+      <form id="application-form" class="application--form">
+        <div class="application--questions">
+          <div class="field-wrapper"><label for="first_name" class="label">First Name<span>*</span></label><input id="first_name" aria-required="true" /></div>
+          <div class="field-wrapper"><label for="last_name" class="label">Last Name<span>*</span></label><input id="last_name" aria-required="true" /></div>
+          <div class="field-wrapper"><label for="preferred_name" class="label">Preferred First Name</label><input id="preferred_name" /></div>
+          <div class="field-wrapper"><label for="email" class="label">Email<span>*</span></label><input id="email" type="text" aria-required="true" /></div>
+          <div class="field-wrapper"><label for="phone" class="label">Phone</label><input id="phone" type="tel" /></div>
+          <div class="field-wrapper"><label for="resume" class="label">Resume/CV<span>*</span></label><input id="resume" type="file" hidden /><button type="button">Attach</button></div>
+          <div class="field-wrapper"><label for="question_linkedin" class="label">LinkedIn Profile</label><input id="question_linkedin" /></div>
+          <div class="field-wrapper combo" data-options="Hong Kong|Singapore|Mainland China|Other">
+            <label for="question_live" id="question_live-label" class="label">Where do you currently live?<span>*</span></label>
+          </div>
+          <div class="field-wrapper combo" data-options="Yes|No">
+            <label for="question_sponsor" id="question_sponsor-label" class="label">Will you require employer sponsorship for a work visa or work permit in the country where you currently reside?<span>*</span></label>
+          </div>
+          <div class="field-wrapper"><label for="question_ai" class="label">Please describe your experience with AI and large language models (LLMs).<span>*</span></label><input id="question_ai" aria-required="true" /></div>
+        </div>
+        <button type="submit">Submit application</button>
+      </form>
+    </main>
+    <script>
+      // A tiny react-select stand-in: combobox input, listbox of role=option, chosen value shown in a sibling.
+      document.querySelectorAll(".combo").forEach(wrapper => {
+        const id = wrapper.querySelector("label").getAttribute("for");
+        const container = document.createElement("div");
+        container.className = "select__container";
+        container.innerHTML = `<div class="select__control"><div class="select__value-container"></div><input id="${id}" role="combobox" aria-autocomplete="list" aria-labelledby="${id}-label" aria-required="true" /></div><div class="select__menu" role="listbox" hidden></div>`;
+        wrapper.appendChild(container);
+        const input = container.querySelector("input");
+        const menu = container.querySelector(".select__menu");
+        const value = container.querySelector(".select__value-container");
+        const options = wrapper.dataset.options.split("|");
+        const open = () => {
+          const q = input.value.toLowerCase();
+          menu.innerHTML = options.filter(o => o.toLowerCase().includes(q)).map(o => `<div role="option" class="select__option">${o}</div>`).join("");
+          menu.hidden = false;
+        };
+        input.addEventListener("input", open);
+        input.addEventListener("keydown", e => (e.key === "ArrowDown" ? open() : e.key === "Escape" ? (menu.hidden = true) : null));
+        menu.addEventListener("click", e => {
+          const option = e.target.closest("[role=option]");
+          if (!option) return;
+          value.innerHTML = `<div class="select__single-value">${option.textContent}</div>`;
+          input.value = "";
+          menu.hidden = true;
+        });
+      });
+    </script>
+  </body>
+</html>

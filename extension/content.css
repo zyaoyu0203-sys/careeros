@@ -23,3 +23,4 @@
 #careeros-panel .cos-btn, #careeros-panel .cos-pick { display: block; width: 100%; margin-top: 6px; padding: 9px 10px; border: 1px solid #13315c; border-radius: 3px; background: #13315c; color: #fff; font: 600 14px system-ui; text-align: left; cursor: pointer; }
 #careeros-panel .cos-pick { background: #fff; color: #13315c; font-weight: 500; }
 .careeros-filled { outline: 2px solid #3b74c4 !important; outline-offset: 1px; }
+#careeros-panel .cos-list { margin: 0 0 8px; padding-left: 18px; font-size: 13px; color: #33435a; }

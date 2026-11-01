@@ -136,3 +136,54 @@ test("the browser extension fills an employer form and records the submission", 
   await expect(page.getByText(/^Submitted \d/)).toBeVisible();
   await expect(page.getByPlaceholder("Recruiter name, referral, interview dates…")).toHaveValue(/confirmation detected by the CareerOS extension/);
 });
+
+test("the extension labels each field correctly on the newer Greenhouse layout and fills dropdowns", async ({ page, baseURL }) => {
+  const postingUrl = "https://job-boards.greenhouse.io/careeros-test/jobs/456";
+  await page.goto("/jobs/new");
+  await page.getByLabel("Company").fill("Northwind Labs");
+  await page.getByLabel("Job title").fill("AI Product Intern II");
+  await page.getByLabel("Link to the posting").fill(postingUrl);
+  await page.getByLabel("Job description").fill("AI product work.");
+  await page.getByRole("button", { name: "Add and score" }).click();
+  await page.getByRole("button", { name: "Prepare application" }).click();
+  await expect(page).toHaveURL(/\/applications\/app_/);
+  const appId = page.url().split("/").pop()!;
+  await page.goto("/settings");
+  await page.getByRole("button", { name: /Generate (a new )?token/ }).click();
+  const token = (await page.locator("code", { hasText: "cos_" }).textContent())!.trim();
+
+  const extensionPath = path.resolve("extension");
+  const context = await chromium.launchPersistentContext(mkdtempSync(path.join(os.tmpdir(), "careeros-ext-")), {
+    channel: "chromium",
+    args: [`--disable-extensions-except=${extensionPath}`, `--load-extension=${extensionPath}`],
+  });
+  try {
+    const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
+    type ExtensionGlobal = { chrome: { storage: { local: { set(items: object): Promise<void> } } } };
+    await worker.evaluate(([baseUrl, t]) => (globalThis as unknown as ExtensionGlobal).chrome.storage.local.set({ baseUrl, token: t }), [baseURL!, token]);
+    await context.route(`${postingUrl}*`, route => route.fulfill({ contentType: "text/html", body: readFileSync("tests/e2e/fixtures/greenhouse-new-form.html", "utf8") }));
+
+    const form = await context.newPage();
+    await form.goto(`${postingUrl}#careeros-app=${appId}`);
+    const panel = form.locator("#careeros-panel");
+    await panel.getByRole("button", { name: "Fill application" }).click();
+    await expect(panel).toContainText(/Filled \d+ fields/);
+
+    // Each field gets its own answer — not the first label in the form.
+    await expect(form.locator("#first_name")).toHaveValue("Alex");
+    await expect(form.locator("#last_name")).toHaveValue("Chen");
+    await expect(form.locator("#email")).toHaveValue("alex.chen@example.com");
+    await expect(form.locator("#phone")).toHaveValue("+852 5555 0100");
+    await expect(form.locator("#question_linkedin")).toHaveValue("linkedin.com/in/alex-chen-example");
+    await expect(form.locator("#preferred_name")).toHaveValue("Alex");
+    // Dropdown chosen from its options; nothing typed into the search box.
+    await expect(form.locator(".field-wrapper", { hasText: "sponsorship" }).locator(".select__single-value")).toHaveText("No");
+    await expect(form.locator("#question_sponsor")).toHaveValue("");
+    // AI is unreachable in tests, so the open questions are listed for the user rather than guessed.
+    await expect(panel).toContainText("Needs your answer");
+    await expect(panel).toContainText("Please describe your experience with AI");
+    expect(await form.locator("#resume").evaluate((i: HTMLInputElement) => i.files?.[0]?.name)).toBe("Alex_Chen_Resume.pdf");
+  } finally {
+    await context.close();
+  }
+});

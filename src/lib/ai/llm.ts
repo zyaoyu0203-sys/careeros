@@ -265,3 +265,51 @@ Do not embellish or add anything that is not in the text.`,
     maxTokens: 16000,
   });
 }
+
+// ---------- Application form questions (browser extension) ----------
+
+export type FormField = { id: number; label: string; kind: "text" | "long" | "select" | "choice"; options: string[]; required: boolean };
+
+const FormAnswersSchema = z.object({
+  answers: z.array(
+    z.object({
+      id: z.number(),
+      answer: z.string().nullable().describe("The answer, an exact option for select/choice fields, or null if the knowledge base doesn't say"),
+    }),
+  ),
+});
+
+/** Answers the questions the fixed rules couldn't, from the knowledge base only. */
+export async function answerFormFields(profile: Profile, job: { company: string; title: string } | null, fields: FormField[]) {
+  if (!fields.length) return [];
+  const custom = profile.answers.custom.filter(c => c.question && c.answer);
+  const result = await structured({
+    system: `You fill in a job application form on behalf of a candidate, using only their knowledge base.
+Rules:
+- For "select" and "choice" fields, answer with one of the listed options, copied exactly, or null. If options are empty, give a short value the field can search for (e.g. "Hong Kong").
+- "text" answers are short (a name, place, number or phrase). "long" answers are 2–5 sentences in first person, specific and drawn from real experience.
+- Equal-opportunity questions (gender, race, ethnicity, disability, veteran status, sexual orientation): choose the "decline"/"prefer not to say" option, or null.
+- "Have you worked at <company> before?" — answer from the experience list.
+- Never invent facts, numbers, employers, dates, visas or legal statements. If the knowledge base doesn't answer it, return null — the candidate will answer it.
+${GROUNDING_RULES}`,
+    prompt: `Candidate knowledge base:\n${profileBrief(profile)}
+Name: ${profile.fullName} · Email: ${profile.email} · Phone: ${profile.phone} · Location: ${profile.location} · LinkedIn: ${profile.linkedin} · Website: ${profile.website}
+Languages: ${profile.languages.join(", ")}
+Saved answers: ${JSON.stringify({ ...profile.answers, custom })}
+${job ? `Applying for: ${job.title} at ${job.company}` : ""}
+
+Form fields:
+${JSON.stringify(fields)}`,
+    schema: FormAnswersSchema,
+    effort: "low",
+    maxTokens: 6000,
+  });
+  if (!result) return [];
+  const byId = new Map(fields.map(f => [f.id, f]));
+  // Trust nothing: drop unknown ids and options the field doesn't offer.
+  return result.answers.filter(a => {
+    const field = byId.get(a.id);
+    if (!field || !a.answer?.trim()) return false;
+    return field.options.length === 0 || field.options.includes(a.answer);
+  });
+}
