@@ -29,7 +29,8 @@ describe("extension tokens", () => {
     const current = await auth.issueExtensionToken("user-b");
     expect(await auth.authenticateExtension(request())).toBeNull();
     expect(await auth.authenticateExtension(request("not-a-token"))).toBeNull();
-    expect(await auth.authenticateExtension(request(`${current.slice(0, -1)}x`))).toBeNull();
+    const tampered = current.slice(0, -1) + (current.endsWith("A") ? "B" : "A"); // always differs
+    expect(await auth.authenticateExtension(request(tampered))).toBeNull();
     expect(await auth.authenticateExtension(request(old))).toBeNull();
     expect(await auth.authenticateExtension(request(current))).toBe("user-b");
   });

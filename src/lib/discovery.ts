@@ -1,5 +1,5 @@
 import "server-only";
-import { aiAvailable, scoreJobs } from "@/lib/ai/claude";
+import { aiAvailable, scoreJobs } from "@/lib/ai/llm";
 import { getPreferences, newId } from "@/lib/data";
 import { fetchAll, type RawJob } from "@/lib/sources";
 import { store } from "@/lib/store";

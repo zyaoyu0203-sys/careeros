@@ -16,7 +16,7 @@ src/
     store/        storage interface + Supabase and local-file implementations
     sources/      job-board fetchers (Greenhouse, Lever, Ashby, Google Jobs)
     discovery.ts  the search pipeline: fetch → filter → dedupe → score → save → log
-    ai/claude.ts  scoring, resume tailoring, cover letters, resume import
+    ai/llm.ts     scoring, tailoring, cover letters, resume import — DeepSeek or Claude behind one structured() call
     insights.ts   pure metric functions behind the dashboard
     autofill.ts   form-label → answer mapping shared with the extension
 extension/        Chrome MV3 extension
@@ -63,8 +63,8 @@ fetchAll ──► per source, in parallel: fetch → normalise to RawJob → re
    ▼
 filter     title must contain a target role (whole words) · not an excluded word · location / remote
 dedupe     against existing jobs by source id and company|title|location
-score      keyword score for all → top 24 re-scored by Claude in batches of 6 (structured output)
-route      suggested resume version per job (focus keywords, or Claude's choice)
+score      keyword score for all → top 24 re-scored by the LLM in batches of 6 (schema-validated JSON)
+route      suggested resume version per job (focus keywords, or the model's choice)
 save       jobs + a SearchRun record + preferences.lastRunAt
 ```
 
@@ -73,7 +73,7 @@ save       jobs + a SearchRun record + preferences.lastRunAt
 - **Manual:** `/api/search` runs the same pipeline and streams NDJSON events (`plan`, one
   `source` per board as it finishes, `phase`, `done`), which the Jobs page renders live.
 - **Failure handling:** a failing board is recorded on the run and skipped; the rest still land.
-  If Claude fails (rate limit, refusal, no credit), keyword scores stand and the error is stored
+  If the LLM call fails (rate limit, refusal, no credit), keyword scores stand and the error is stored
   on the run. The Insights page aggregates runs into per-board success rate and latency.
 
 ### One-click apply
@@ -98,7 +98,7 @@ service worker; content scripts on employer pages never see it.
 
 ### Resume tailoring
 
-Claude receives the knowledge base and the job description and returns structured output:
+The LLM receives the knowledge base and the job description and returns structured output:
 headline, summary, chosen experience ids with rewritten bullets, and ordered skills. The prompt
 forbids anything not in the knowledge base; the response is validated against a Zod schema and
 experience ids not in the profile are dropped. Drafts start unapproved and appear on the home

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { aiAvailable, importResumeText, tailorResume, writeCoverLetter } from "@/lib/ai/claude";
+import { aiAvailable, importResumeText, tailorResume, writeCoverLetter } from "@/lib/ai/llm";
 import { getPreferences, getProfile, newId } from "@/lib/data";
 import { addManualJob, chooseResumeVersion, runDiscovery } from "@/lib/discovery";
 import { issueExtensionToken } from "@/lib/extension-auth";

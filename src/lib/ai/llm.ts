@@ -4,9 +4,21 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import * as z from "zod/v4";
 import type { Job, Profile, Resume, ResumeContent } from "@/lib/types";
 
-const MODEL = "claude-opus-5-5";
+// Two interchangeable providers behind one `structured()` call. DeepSeek (or any OpenAI-compatible
+// endpoint hosting it, e.g. Volcengine Ark) is used when DEEPSEEK_API_KEY is set; otherwise Claude.
 
-export const aiAvailable = () => Boolean(process.env.ANTHROPIC_API_KEY);
+const CLAUDE_MODEL = "claude-opus-5-5";
+const deepseek = () =>
+  process.env.DEEPSEEK_API_KEY
+    ? {
+        key: process.env.DEEPSEEK_API_KEY,
+        baseUrl: (process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, ""),
+        model: process.env.DEEPSEEK_MODEL || "deepseek-chat",
+      }
+    : null;
+
+export const aiAvailable = () => Boolean(process.env.DEEPSEEK_API_KEY || process.env.ANTHROPIC_API_KEY);
+export const aiProvider = () => (deepseek() ? "deepseek" : process.env.ANTHROPIC_API_KEY ? "claude" : null);
 
 let client: Anthropic | null = null;
 const anthropic = () => (client ??= new Anthropic());
@@ -41,16 +53,23 @@ function profileBrief(profile: Profile) {
   });
 }
 
-/** Structured call with server-side refusal fallback; returns null when Claude declines. */
-async function structured<T>(opts: {
+type StructuredRequest<T> = {
   system: string;
   prompt: string;
   schema: z.ZodType<T>;
   effort: "low" | "medium" | "high";
   maxTokens: number;
-}): Promise<T | null> {
+};
+
+/** A JSON answer validated against `schema`, or null when the model declines or can't comply. */
+async function structured<T>(opts: StructuredRequest<T>): Promise<T | null> {
+  const ds = deepseek();
+  return ds ? structuredDeepSeek(ds, opts) : structuredClaude(opts);
+}
+
+async function structuredClaude<T>(opts: StructuredRequest<T>): Promise<T | null> {
   const response = await anthropic().beta.messages.parse({
-    model: MODEL,
+    model: CLAUDE_MODEL,
     max_tokens: opts.maxTokens,
     betas: ["server-side-fallback-2026-07-01"],
     fallbacks: "default",
@@ -60,6 +79,45 @@ async function structured<T>(opts: {
   });
   if (response.stop_reason === "refusal" || response.stop_reason === "max_tokens") return null;
   return response.parsed_output ?? null;
+}
+
+/** Strips code fences some models wrap JSON in. */
+export function extractJson(text: string): unknown {
+  const body = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  return JSON.parse(body);
+}
+
+async function structuredDeepSeek<T>(ds: NonNullable<ReturnType<typeof deepseek>>, opts: StructuredRequest<T>): Promise<T | null> {
+  // OpenAI-compatible JSON mode: the schema goes in the prompt and the reply is validated here.
+  const system = `${opts.system}
+
+Reply with a single JSON object (no prose, no code fences) that matches this JSON Schema:
+${JSON.stringify(z.toJSONSchema(opts.schema))}`;
+  const call = async (jsonMode: boolean) =>
+    fetch(`${ds.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${ds.key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: ds.model,
+        max_tokens: Math.min(opts.maxTokens, 8000),
+        temperature: 0.2,
+        ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: opts.prompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+  let res = await call(true);
+  if (res.status === 400) res = await call(false); // some hosts don't support JSON mode
+  if (!res.ok) throw new Error(`DeepSeek ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
+  const choice = data.choices?.[0];
+  if (!choice?.message?.content || choice.finish_reason === "length") return null;
+  const parsed = opts.schema.safeParse(extractJson(choice.message.content));
+  return parsed.success ? parsed.data : null;
 }
 
 // ---------- Job scoring ----------

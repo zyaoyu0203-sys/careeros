@@ -3,7 +3,7 @@ import { chooseResumeVersion, isDue, keywordScore, passesFilters } from "@/lib/d
 import { prefs, profile, rawJob, resume } from "../support/fixtures";
 
 // discovery.ts imports the AI client and store; the pure functions under test don't touch them.
-vi.mock("@/lib/ai/claude", () => ({ aiAvailable: () => false, scoreJobs: vi.fn() }));
+vi.mock("@/lib/ai/llm", () => ({ aiAvailable: () => false, scoreJobs: vi.fn() }));
 
 describe("passesFilters", () => {
   it("matches target roles as whole words in the title", () => {

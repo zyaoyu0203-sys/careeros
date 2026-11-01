@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Brand } from "@/components/brand";
-import { aiAvailable } from "@/lib/ai/claude";
+import { aiAvailable } from "@/lib/ai/llm";
 import { getPreferences, getProfile } from "@/lib/data";
 import { requireUserId } from "@/lib/session";
 import { googleJobsAvailable } from "@/lib/sources";

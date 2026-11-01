@@ -6,7 +6,7 @@ import { ActionButton } from "@/components/action-button";
 import { OneClickApply } from "@/components/one-click-apply";
 import { SearchButton } from "@/components/search-button";
 import { Badge, Button, Card, CompanyMark, EmptyState, LinkButton, PageHeader, ScorePill, buttonClass, cx, formatDate, relativeDays } from "@/components/ui";
-import { aiAvailable } from "@/lib/ai/claude";
+import { aiAvailable } from "@/lib/ai/llm";
 import { getPreferences, listJobs, listResumes } from "@/lib/data";
 import { requireUserId } from "@/lib/session";
 import type { Job, JobStatus } from "@/lib/types";

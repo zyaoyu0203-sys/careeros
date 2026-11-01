@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { deleteApplication } from "@/app/actions";
 import { Badge, Button, Card, LinkButton, PageHeader, buttonClass, formatDate } from "@/components/ui";
-import { aiAvailable } from "@/lib/ai/claude";
+import { aiAvailable } from "@/lib/ai/llm";
 import { getProfile, listResumes } from "@/lib/data";
 import { requireUserId } from "@/lib/session";
 import { statusMeta } from "@/lib/status";
