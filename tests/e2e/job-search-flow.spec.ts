@@ -106,7 +106,9 @@ test("the browser extension fills an employer form and records the submission", 
   });
   try {
     const worker = context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-    await worker.evaluate(([baseUrl, t]) => chrome.storage.local.set({ baseUrl, token: t }), [baseURL!, token]);
+    // Runs inside the extension's service worker, where `chrome` is the extension API.
+    type ExtensionGlobal = { chrome: { storage: { local: { set(items: object): Promise<void> } } } };
+    await worker.evaluate(([baseUrl, t]) => (globalThis as unknown as ExtensionGlobal).chrome.storage.local.set({ baseUrl, token: t }), [baseURL!, token]);
     await context.route(`${postingUrl}*`, route => route.fulfill({ contentType: "text/html", body: readFileSync("tests/e2e/fixtures/greenhouse-form.html", "utf8") }));
 
     const form = await context.newPage();
