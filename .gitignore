@@ -48,3 +48,6 @@ next-env.d.ts
 /.next-e2e
 /playwright-report
 /test-results
+
+# supabase cli local state
+/supabase/.temp

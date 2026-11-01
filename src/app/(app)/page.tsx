@@ -41,7 +41,7 @@ export default async function HomePage() {
     newJobs.length
       ? {
           overline: "Job push",
-          title: `${todayJobs.length || newJobs.length} new roles matched to you`,
+          title: `${todayJobs.length || newJobs.length} new role${(todayJobs.length || newJobs.length) === 1 ? "" : "s"} matched to you`,
           body: topJob ? `Top match: ${topJob.title} at ${topJob.company}, scored against your knowledge base and preferences.` : "Ranked by fit with your experience.",
           cta: { label: "Review matches", href: "/jobs" },
           figure: String(todayJobs.length || newJobs.length).padStart(2, "0"),
