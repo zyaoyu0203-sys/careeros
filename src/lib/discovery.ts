@@ -3,7 +3,11 @@ import { aiAvailable, scoreJobs } from "@/lib/ai/claude";
 import { getPreferences, newId } from "@/lib/data";
 import { fetchAll, type RawJob } from "@/lib/sources";
 import { store } from "@/lib/store";
-import type { Job, Preferences, Profile, Resume, SearchRun } from "@/lib/types";
+import type { Job, Preferences, Profile, Resume, SearchRun, SourceStat } from "@/lib/types";
+
+export type DiscoveryEvent =
+  | { type: "source"; stat: SourceStat }
+  | { type: "phase"; phase: "filtering" | "scoring" | "saving"; detail: string };
 
 const MAX_AI_SCORED_PER_RUN = 24;
 
@@ -90,7 +94,11 @@ export function isDue(prefs: Preferences, now = new Date()) {
 
 const MAX_RUNS_KEPT = 30;
 
-export async function runDiscovery(userId: string, opts: { system?: boolean; trigger?: SearchRun["trigger"] } = {}): Promise<SearchRun> {
+export async function runDiscovery(
+  userId: string,
+  opts: { system?: boolean; trigger?: SearchRun["trigger"]; onEvent?: (e: DiscoveryEvent) => void } = {},
+): Promise<SearchRun> {
+  const emit = opts.onEvent ?? (() => {});
   const startedAt = new Date().toISOString();
   const db = store(opts);
   const [prefs, profile, resumes, existing] = await Promise.all([
@@ -102,7 +110,8 @@ export async function runDiscovery(userId: string, opts: { system?: boolean; tri
   if (!profile) throw new Error("Complete onboarding before running discovery");
   const versions = resumes.filter(r => r.kind === "version");
 
-  const { jobs: raw, stats } = await fetchAll(prefs);
+  const { jobs: raw, stats } = await fetchAll(prefs, stat => emit({ type: "source", stat }));
+  emit({ type: "phase", phase: "filtering", detail: `Filtering ${raw.length} roles by title, location and seniority` });
   const seen = new Set(existing.flatMap(j => [j.sourceId, dedupeKey(j)]));
   const fresh: RawJob[] = [];
   for (const job of raw) {
@@ -131,6 +140,7 @@ export async function runDiscovery(userId: string, opts: { system?: boolean; tri
   let aiScored = 0;
   let aiError: string | null = null;
   if (aiAvailable() && candidates.length) {
+    emit({ type: "phase", phase: "scoring", detail: `AI scoring the top ${Math.min(candidates.length, MAX_AI_SCORED_PER_RUN)} matches against your knowledge base` });
     const top = candidates.slice(0, MAX_AI_SCORED_PER_RUN);
     try {
       const scores = await scoreJobs(profile, versions, top);
@@ -153,6 +163,7 @@ export async function runDiscovery(userId: string, opts: { system?: boolean; tri
     }
   }
 
+  emit({ type: "phase", phase: "saving", detail: `Saving ${candidates.length} new roles` });
   await db.putMany(userId, "jobs", candidates.map(job => ({ id: job.id, data: job })));
 
   const failed = stats.filter(s => s.error).length;

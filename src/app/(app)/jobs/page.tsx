@@ -1,12 +1,12 @@
 import { Bookmark, ExternalLink, EyeOff, FileText, Plus, Send, ShieldAlert, Sparkles, ThumbsUp, Undo2 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { discoverNow, prepareApplication, setJobStatus, tailorForJob } from "@/app/actions";
+import { prepareApplication, setJobStatus, tailorForJob } from "@/app/actions";
 import { ActionButton } from "@/components/action-button";
+import { SearchButton } from "@/components/search-button";
 import { Badge, Button, Card, CompanyMark, EmptyState, LinkButton, PageHeader, ScorePill, buttonClass, cx, formatDate, relativeDays } from "@/components/ui";
 import { aiAvailable } from "@/lib/ai/claude";
-import { getPreferences, isDemoUser, listJobs, listResumes } from "@/lib/data";
-import { DemoOneClickApply, DemoSearchButton } from "@/components/demo-flows";
+import { getPreferences, listJobs, listResumes } from "@/lib/data";
 import { requireUserId } from "@/lib/session";
 import type { Job, JobStatus } from "@/lib/types";
 
@@ -32,7 +32,6 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   const params = await searchParams;
   const userId = await requireUserId();
   const [jobs, resumes, prefs] = await Promise.all([listJobs(userId), listResumes(userId), getPreferences(userId)]);
-  const demo = isDemoUser(userId);
   const view = (VIEWS.find(v => v.key === params.view)?.key ?? "new") as JobStatus | "all";
   const q = (params.q ?? "").trim().toLowerCase();
 
@@ -65,13 +64,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
             <LinkButton href="/jobs/new" variant="secondary">
               <Plus size={16} /> Add a job
             </LinkButton>
-            {demo ? (
-              <DemoSearchButton />
-            ) : (
-              <ActionButton action={discoverNow} pendingLabel="Searching sources…">
-                <Sparkles size={16} /> Search now
-              </ActionButton>
-            )}
+            <SearchButton />
           </>
         }
       />
@@ -154,14 +147,14 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               </li>
             ))}
           </ul>
-          {selected ? <JobDetail demoVersions={demo ? resumes.filter(r => r.kind === "version").map(r => ({ id: r.id, name: r.name })) : null} job={selected} resumeName={resumes.find(r => r.id === selected.suggestedResumeId)?.name} hasTailored={resumes.some(r => r.jobId === selected.id)} tailoredId={resumes.find(r => r.jobId === selected.id)?.id} /> : <div />}
+          {selected ? <JobDetail job={selected} resumeName={resumes.find(r => r.id === selected.suggestedResumeId)?.name} hasTailored={resumes.some(r => r.jobId === selected.id)} tailoredId={resumes.find(r => r.jobId === selected.id)?.id} /> : <div />}
         </div>
       )}
     </>
   );
 }
 
-function JobDetail({ job, resumeName, hasTailored, tailoredId, demoVersions }: { job: Job; resumeName?: string; hasTailored: boolean; tailoredId?: string; demoVersions: { id: string; name: string }[] | null }) {
+function JobDetail({ job, resumeName, hasTailored, tailoredId }: { job: Job; resumeName?: string; hasTailored: boolean; tailoredId?: string }) {
   const ai = aiAvailable();
   return (
     <article className="max-h-[78vh] overflow-y-auto px-6 py-6 sm:px-8">
@@ -226,9 +219,6 @@ function JobDetail({ job, resumeName, hasTailored, tailoredId, demoVersions }: {
       </div>
 
       <div className="mt-6 flex flex-wrap items-start gap-2 rounded-[4px] border border-navy-900 bg-blue-50 p-4">
-        {demoVersions && job.status !== "applying" && (
-          <DemoOneClickApply jobId={job.id} company={job.company} versions={demoVersions} suggestedId={job.suggestedResumeId} />
-        )}
         <form action={prepareApplication.bind(null, job.id)}>
           <Button>
             <Send size={16} /> {job.status === "applying" ? "Open application pack" : "Prepare application"}

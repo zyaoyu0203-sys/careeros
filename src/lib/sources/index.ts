@@ -121,8 +121,11 @@ async function googleJobs(query: string, location: string): Promise<RawJob[]> {
 
 export const googleJobsAvailable = () => Boolean(process.env.SERPAPI_API_KEY);
 
-/** Fetch from every configured source. A failing source is recorded, not fatal. */
-export async function fetchAll(prefs: Preferences): Promise<{ jobs: RawJob[]; stats: SourceStat[] }> {
+export function sourceLabels(prefs: Preferences) {
+  return planSources(prefs).map(t => t.label);
+}
+
+function planSources(prefs: Preferences) {
   const tasks: { label: string; run: () => Promise<RawJob[]> }[] = [
     ...prefs.sources.greenhouse.map(b => ({ label: `Greenhouse/${b}`, run: () => greenhouse(b) })),
     ...prefs.sources.lever.map(c => ({ label: `Lever/${c}`, run: () => lever(c) })),
@@ -137,6 +140,12 @@ export async function fetchAll(prefs: Preferences): Promise<{ jobs: RawJob[]; st
     }
   }
 
+  return tasks;
+}
+
+/** Fetch from every configured source. A failing source is recorded, not fatal. */
+export async function fetchAll(prefs: Preferences, onSource?: (stat: SourceStat) => void): Promise<{ jobs: RawJob[]; stats: SourceStat[] }> {
+  const tasks = planSources(prefs);
   const jobs: RawJob[] = [];
   const stats = await Promise.all(
     tasks.map(async (task): Promise<SourceStat> => {
@@ -144,9 +153,13 @@ export async function fetchAll(prefs: Preferences): Promise<{ jobs: RawJob[]; st
       try {
         const found = await task.run();
         jobs.push(...found);
-        return { label: task.label, fetched: found.length, ms: Date.now() - started, error: null };
+        const stat = { label: task.label, fetched: found.length, ms: Date.now() - started, error: null };
+        onSource?.(stat);
+        return stat;
       } catch (error) {
-        return { label: task.label, fetched: 0, ms: Date.now() - started, error: error instanceof Error ? error.message : String(error) };
+        const stat = { label: task.label, fetched: 0, ms: Date.now() - started, error: error instanceof Error ? error.message : String(error) };
+        onSource?.(stat);
+        return stat;
       }
     }),
   );
