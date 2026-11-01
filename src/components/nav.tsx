@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { cx } from "@/components/ui";
 
@@ -35,10 +35,18 @@ export function MainNav({ items }: { items: NavItem[] }) {
                 </span>
               ) : null}
               {active && <span className="absolute inset-x-0 bottom-0 h-[3px] bg-amber-500" />}
+              <PendingBar />
             </Link>
           );
         })}
       </div>
     </nav>
   );
+}
+
+/** Immediate feedback while the clicked page loads. */
+function PendingBar() {
+  const { pending } = useLinkStatus();
+  if (!pending) return null;
+  return <span aria-hidden className="absolute inset-x-0 top-0 h-[3px] animate-pulse bg-amber-500" />;
 }

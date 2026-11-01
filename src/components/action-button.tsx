@@ -7,7 +7,8 @@ import { Button } from "@/components/ui";
 
 /**
  * Runs a server action that returns an ActionResult and shows its outcome inline.
- * `onSuccessHref` receives the action's message (e.g. a new record id) to build a redirect.
+ * On success, `successHrefPrefix` + the action's message (e.g. a new record id) is opened.
+ * (A string, not a callback: props from server components must be serialisable.)
  */
 export function ActionButton({
   action,
@@ -15,14 +16,14 @@ export function ActionButton({
   pendingLabel,
   variant,
   size,
-  onSuccessHref,
+  successHrefPrefix,
 }: {
   action: () => Promise<ActionResult>;
   children: ReactNode;
   pendingLabel: string;
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md";
-  onSuccessHref?: (message: string) => string;
+  successHrefPrefix?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -38,7 +39,7 @@ export function ActionButton({
           start(async () => {
             const r = await action();
             setResult(r);
-            if (r.ok && onSuccessHref) router.push(onSuccessHref(r.message ?? ""));
+            if (r.ok && successHrefPrefix) router.push(successHrefPrefix + (r.message ?? ""));
             else router.refresh();
           })
         }

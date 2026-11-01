@@ -231,7 +231,7 @@ function JobDetail({ job, versions, resumeName, hasTailored, tailoredId }: { job
             <FileText size={16} /> View tailored resume
           </LinkButton>
         ) : ai ? (
-          <ActionButton action={tailorForJob.bind(null, job.id)} pendingLabel="Tailoring resume…" variant="secondary" onSuccessHref={id => `/resumes?id=${id}`}>
+          <ActionButton action={tailorForJob.bind(null, job.id)} pendingLabel="Tailoring resume…" variant="secondary" successHrefPrefix="/resumes?id=">
             <Sparkles size={16} /> Tailor resume
           </ActionButton>
         ) : (

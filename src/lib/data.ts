@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { store } from "@/lib/store";
 import type { Application, Job, Preferences, Profile, Resume, SearchRun } from "@/lib/types";
 
@@ -42,35 +43,35 @@ export const defaultPreferences = (): Preferences => ({
   lastRunSummary: null,
 });
 
-export async function getProfile(userId: string): Promise<Profile> {
+export const getProfile = cache(async function getProfile(userId: string): Promise<Profile> {
   const saved = await store().get(userId, "profile", "me");
   return saved ? { ...emptyProfile(), ...saved, answers: { ...emptyProfile().answers, ...saved.answers } } : emptyProfile();
-}
+});
 
 export async function getPreferences(userId: string, opts?: { system?: boolean }): Promise<Preferences> {
   const saved = await store(opts).get(userId, "preferences", "me");
   return saved ? { ...defaultPreferences(), ...saved, sources: { ...defaultPreferences().sources, ...saved.sources } } : defaultPreferences();
 }
 
-export async function listJobs(userId: string): Promise<Job[]> {
+export const listJobs = cache(async function listJobs(userId: string): Promise<Job[]> {
   const jobs = await store().list(userId, "jobs");
   return jobs.sort((a, b) => b.score - a.score || b.fetchedAt.localeCompare(a.fetchedAt));
-}
+});
 
-export async function listResumes(userId: string): Promise<Resume[]> {
+export const listResumes = cache(async function listResumes(userId: string): Promise<Resume[]> {
   const resumes = await store().list(userId, "resumes");
   return resumes.sort((a, b) => (a.kind === b.kind ? b.updatedAt.localeCompare(a.updatedAt) : a.kind === "version" ? -1 : 1));
-}
+});
 
-export async function listApplications(userId: string): Promise<Application[]> {
+export const listApplications = cache(async function listApplications(userId: string): Promise<Application[]> {
   const apps = await store().list(userId, "applications");
   return apps.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
+});
 
-export async function listRuns(userId: string): Promise<SearchRun[]> {
+export const listRuns = cache(async function listRuns(userId: string): Promise<SearchRun[]> {
   const runs = await store().list(userId, "runs");
   return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
-}
+});
 
 /** Share of onboarding fields that are filled — drives the "profile strength" meter. */
 export function profileCompleteness(profile: Profile): { percent: number; missing: string[] } {
