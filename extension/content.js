@@ -70,16 +70,35 @@
     const listbox = document.getElementById(el.getAttribute("aria-controls") || el.getAttribute("aria-owns") || "");
     return [...(listbox ?? selectRoot(el)).querySelectorAll("[role=option]")];
   }
+  // Script-dispatched events first; widgets that ignore them get real input via the worker.
+  async function trustedClick(node) {
+    node.scrollIntoView({ block: "center" });
+    await sleep(80);
+    const r = node.getBoundingClientRect();
+    const res = await send({ type: "trustedClick", x: r.left + r.width / 2, y: r.top + r.height / 2 });
+    await sleep(250);
+    return Boolean(res?.ok);
+  }
+  const trustedKey = (key, code, keyCode) => send({ type: "trustedKey", key, code, keyCode });
+
+  async function openMenu(el) {
+    el.focus();
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", keyCode: 40, bubbles: true }));
+    await sleep(250);
+    if (el.getAttribute("aria-expanded") === "true" || optionNodes(el).length) return true;
+    await trustedClick(el.closest("[class*='__control' i], [class*='-control' i]") ?? el);
+    return el.getAttribute("aria-expanded") === "true" || optionNodes(el).length > 0;
+  }
+
   async function closeMenu(el) {
+    if (el.getAttribute("aria-expanded") === "true") await trustedKey("Escape", "Escape", 27);
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", code: "Escape", bubbles: true }));
     el.blur();
     await sleep(120);
   }
 
   async function comboboxOptions(el) {
-    el.focus();
-    el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
-    await sleep(300);
+    if (!(await openMenu(el))) return [];
     const options = optionNodes(el).map(o => clean(o.textContent)).filter(Boolean).slice(0, 400);
     await closeMenu(el);
     return options;
@@ -95,7 +114,9 @@
       const filled = kind === "select" ? Boolean(el.value) : kind === "choice" ? hasChoice(el) : Boolean(el.value.trim());
       if (filled) continue; // never overwrite what's there
       const options = kind === "select" ? [...el.options].map(o => clean(o.text)).filter(t => t && !/^select/i.test(t)) : kind === "choice" ? await comboboxOptions(el) : [];
-      fields.push({ el, label, kind, options, required: isRequired(el, label) });
+      // Very long lists (countries) may render only part of their options: treat them as searchable,
+      // so the answer is free text that gets typed into the dropdown's search.
+      fields.push({ el, label, kind, options: options.length >= 150 ? [] : options, required: isRequired(el, label) });
     }
     return fields;
   }
@@ -124,29 +145,26 @@
       if (!option) return false;
       setValue(el, option.value);
     } else if (kind === "choice") {
-      el.focus();
-      el.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }));
-      setValue(el, answer); // filters long lists, where supported
-      await sleep(350);
+      if (!(await openMenu(el))) return false;
       let options = optionNodes(el);
       let target = bestOption(options.map(o => clean(o.textContent)), answer);
       if (!target) {
-        // Some boards don't filter by typing: clear the text and pick from the full list.
-        setValue(el, "");
-        await sleep(250);
-        options = optionNodes(el);
-        target = bestOption(options.map(o => clean(o.textContent)), answer);
+        // Searchable lists may load results from the server: type, then wait for a match (≤3 s).
+        await send({ type: "trustedType", text: answer });
+        for (let waited = 0; waited < 3000 && !target; waited += 250) {
+          await sleep(250);
+          options = optionNodes(el);
+          target = bestOption(options.map(o => clean(o.textContent)), answer);
+        }
       }
       const node = options.find(o => clean(o.textContent) === target);
       if (!node) {
-        setValue(el, "");
         await closeMenu(el);
         return false;
       }
-      node.scrollIntoView({ block: "nearest" });
-      node.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
       node.click();
       await sleep(150);
+      if (!hasChoice(el)) await trustedClick(node);
       if (!hasChoice(el)) {
         await closeMenu(el);
         return false; // the dropdown didn't accept it — leave it for the user
@@ -253,6 +271,7 @@
       const progress = text => render(`<p class="cos-muted">${escape(text)}</p>`);
       const { byRule, byAi, left } = await fillForm(pack, progress);
       const resumeProblem = await attachResume(pack);
+      await send({ type: "release" }); // detach the debugger: the "debugging" bar goes away
       render(`
         <p class="cos-ok">✓ Filled ${byRule + byAi} field${byRule + byAi === 1 ? "" : "s"}${byAi ? ` (${byAi} answered by AI from your profile)` : ""}${resumeProblem ? "" : " and attached your resume"}.</p>
         ${resumeProblem ? `<p class="cos-err">${escape(resumeProblem)}</p>` : ""}

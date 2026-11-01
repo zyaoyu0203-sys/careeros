@@ -51,7 +51,51 @@ const handlers = {
   },
 };
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// Real (trusted) input for widgets that ignore script-dispatched events, such as react-select
+// dropdowns on the newer Greenhouse boards. Chrome shows its "debugging this browser" bar while
+// attached; we detach as soon as the form is filled.
+const attached = new Set();
+async function cdp(tabId, method, params) {
+  if (!attached.has(tabId)) {
+    await chrome.debugger.attach({ tabId }, "1.3");
+    attached.add(tabId);
+  }
+  return chrome.debugger.sendCommand({ tabId }, method, params);
+}
+chrome.debugger.onDetach.addListener(source => attached.delete(source.tabId));
+
+const tabHandlers = {
+  async trustedClick({ x, y }, tabId) {
+    for (const type of ["mouseMoved", "mousePressed", "mouseReleased"]) {
+      await cdp(tabId, "Input.dispatchMouseEvent", { type, x, y, button: "left", clickCount: 1 });
+    }
+    return true;
+  },
+  async trustedKey({ key, code, keyCode }, tabId) {
+    for (const type of ["keyDown", "keyUp"]) {
+      await cdp(tabId, "Input.dispatchKeyEvent", { type, key, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode });
+    }
+    return true;
+  },
+  async trustedType({ text }, tabId) {
+    await cdp(tabId, "Input.insertText", { text });
+    return true;
+  },
+  async release(_message, tabId) {
+    if (attached.has(tabId)) await chrome.debugger.detach({ tabId }).catch(() => {});
+    attached.delete(tabId);
+    return true;
+  },
+};
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  const tabHandler = tabHandlers[message?.type];
+  if (tabHandler) {
+    tabHandler(message, sender.tab?.id)
+      .then(data => sendResponse({ ok: true, data }))
+      .catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   const handler = handlers[message?.type];
   if (!handler) return false;
   handler(message)
